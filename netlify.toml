@@ -1,0 +1,23 @@
+# Админ-панель ТКПСТ: статичные страницы (public/) + закрытый сервер (Netlify Functions + Blobs).
+[build]
+  publish = "public"
+  # Сборка не пройдёт, если упали тесты. Версия файлов — чтобы браузер сразу брал новые.
+  command = "node --experimental-strip-types --test test/*.test.mjs && sed -i \"s/__V__/${COMMIT_REF:0:8}/g\" public/*.html public/*.js"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://api.thisishyum.ru; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    X-Frame-Options = "DENY"
+    X-Robots-Tag = "noindex, nofollow"
+    Strict-Transport-Security = "max-age=31536000"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
