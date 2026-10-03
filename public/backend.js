@@ -379,7 +379,13 @@ export async function checkGithubKey(token) {
     for (const repo of [DATA_REPO, SCHEDULE_REPO]) {
       let r;
       try { r = await gh(`/repos/${OWNER}/${repo}`); } catch (e) {
-        if (e.code === 'gh_key') return ['GitHub не принял ключ — скорее всего, он скопирован не полностью или удалён. Создай новый и скопируй кнопкой копирования рядом с ним'];
+        if (e.code === 'gh_key') {
+          const kind = token.startsWith('github_pat_') ? 'fine-grained' : 'classic';
+          const want = kind === 'fine-grained' ? 93 : 40;
+          return [`GitHub ответил «Bad credentials» (ключ не существует или отозван). Вставлено символов: ${token.length}`
+            + (token.length !== want ? ` — а у такого ключа их ${want}, значит скопирован не целиком` : ' — длина правильная, значит этот ключ уже удалён/перевыпущен (в буфере старый ключ?)')
+            + `. Начало: ${token.slice(0, 15)}…`];
+        }
         throw e;
       }
       if (!r.ok) { problems.push(`нет доступа к репозиторию ${repo}`); continue; }
