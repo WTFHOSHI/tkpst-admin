@@ -375,8 +375,13 @@ export async function checkGithubKey(token) {
   S = { gh: token };
   try {
     const problems = [];
+    if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(token)) return ['это не похоже на ключ GitHub — он начинается с github_pat_ и копируется целиком кнопкой копирования'];
     for (const repo of [DATA_REPO, SCHEDULE_REPO]) {
-      const r = await gh(`/repos/${OWNER}/${repo}`);
+      let r;
+      try { r = await gh(`/repos/${OWNER}/${repo}`); } catch (e) {
+        if (e.code === 'gh_key') return ['GitHub не принял ключ — скорее всего, он скопирован не полностью или удалён. Создай новый и скопируй кнопкой копирования рядом с ним'];
+        throw e;
+      }
       if (!r.ok) { problems.push(`нет доступа к репозиторию ${repo}`); continue; }
       if (repo === DATA_REPO && !r.body.private) problems.push(`репозиторий ${repo} должен быть ПРИВАТНЫМ`);
       if (r.body.permissions && !r.body.permissions.push) problems.push(`у ключа нет права записи в ${repo} (Contents: Read and write)`);
