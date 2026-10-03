@@ -168,8 +168,11 @@ async function runMigration() {
     say('Вход на старый сервер…');
     const { token } = await old('login', { password: val('oldpw') });
     const config = await old('config', null, token);
-    const students = Object.values(config.courses || {}).reduce((n, c) => n + (c.students || []).length, 0);
-    say(`Студентов: ${students}`);
+    for (const k of ['1', '2', '3']) {
+      const list = (config.courses?.[k]?.students) || [];
+      const gone = list.filter((x) => x.to).length;
+      say(`${k} курс: в списке ${list.length - gone}` + (gone ? `, ещё ${gone} убраны из списка (их старые отметки сохраняются)` : ''));
+    }
     let current = null;
     try { current = await api('config'); } catch (e) { if (e.code === 'no_repo') throw e; }
     const has = current && Object.values(current.courses).some((c) => c.students.length);
