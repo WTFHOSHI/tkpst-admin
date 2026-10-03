@@ -82,12 +82,13 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .att-toolbar .small-btn svg { width: 18px; height: 18px; }
 .att-toolbar .small-btn.on { background: var(--primary-c); color: var(--on-primary-c); border-color: transparent; }
 .att-days { margin: 0; }
+.att-content { display: flex; flex-direction: column; gap: 12px; }
 
 .att-grid { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--n), 46px); gap: 5px 4px; align-items: stretch; margin-top: 12px; }
 .att-h { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; text-align: center; min-width: 0; padding-bottom: 4px; border-bottom: 1px solid var(--outline); }
 .att-h.name { align-items: flex-start; }
 .att-h b { font-size: 13px; }
-.att-h .subj { font-size: 10px; line-height: 1.15; color: var(--muted); max-width: 46px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+.att-h .subj { font-size: 10px; line-height: 1.15; color: var(--muted); max-width: 46px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: normal; overflow-wrap: anywhere; hyphens: auto; }
 .att-h .small-btn { font-size: 11px; padding: 2px 4px; }
 .att-name { display: flex; align-items: center; gap: 6px; text-align: left; min-width: 0; padding: 2px 4px; border-radius: 10px; }
 .att-name:active { background: var(--card-high); }
@@ -155,3 +156,14 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .att-prow.on b { color: var(--text); }
 .att-prow .college { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-prow .small-btn { border: 1px solid var(--outline); padding: 6px 12px; font-weight: 600; }
+
+/* Компьютер: таблица дня не жмётся к правому краю — пары рядом с ФИО, колонки шире, предмет читается. */
+@media (min-width: 700px) {
+  .att-grid { grid-template-columns: minmax(220px, 360px) repeat(var(--n), minmax(72px, 180px)); gap: 6px 8px; justify-content: start; }
+  .att-h { padding-bottom: 6px; }
+  .att-h b { font-size: 14px; }
+  .att-h .subj { max-width: 100%; font-size: 12px; }
+  .att-h .small-btn { font-size: 12px; padding: 3px 6px; }
+  .att-name .nm { font-size: 15px; }
+  .att-cell { height: 44px; }
+}

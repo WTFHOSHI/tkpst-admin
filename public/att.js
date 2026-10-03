@@ -282,7 +282,7 @@ function shell() {
         ${can('import') ? '<button class="small-btn" data-panel="settings">Загрузить таблицу</button>' : ''}
       </div>
       <div data-panelbox></div>
-      <div data-content></div>
+      <div class="att-content" data-content></div>
     </main>
     <div class="savebar att-bar">
       <div class="brushes" data-brushes>
