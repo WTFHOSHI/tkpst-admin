@@ -1,17 +1,16 @@
-// Вкладка «Посещаемость» админ-панели. Данные — на закрытом сервере (Netlify), не в репозитории:
+// Вкладка «Посещаемость» админ-панели. Данные — в приватном репозитории tkpst-admin-data, зашифрованы (см. backend.js):
 // сайт расписания и приложения Android/iOS их не видят.
 import { T, buildTimeline, setOverrides, parseLessons } from './js/core.js?v=__V__';
 import {
   MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
   weeksOfMonth, monthOfWeek, activeStudents, dayPairs, studentTotals, attendanceWorkbook, buildXlsx, parseOldXlsx,
 } from './att-core.js?v=__V__';
+import { api as backend, loggedIn, logout } from './backend.js?v=__V__';
 
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname); // локальная проверка
-const API = '/api'; // админка и сервер на одном адресе
 const SCHED = LOCAL ? '/sched' : 'https://api.thisishyum.ru/schedule_api/tyumen';
 const OWN_GROUP = 196; // ИС-25-3С — одна группа на всех курсах; к ней применяются изменения из «Изменения расписания»
 const GROUP_NAME = 'ИС-25-3С';
-const TOKEN_KEY = 'att_token';
 const PREF_KEY = 'att_prefs';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -30,7 +29,7 @@ const todayIso = () => T.iso(T.dayStart(T.now()));
 
 let $app = null;
 const st = {
-  token: store.get(TOKEN_KEY) || '', role: '', title: '',
+  role: '', title: '',
   config: null, course: '2', month: '', monday: '', day: '', view: '', brush: 'N',
   week: null, weekKey: '',
   pending: new Map(),   // 'course|monday|sid|iso|pair' → код | null
@@ -50,23 +49,11 @@ const viewMode = () => st.view || (isWide() ? 'week' : 'day');
 // ---------------- Сеть ----------------
 
 async function api(path, body) {
-  let r;
-  try {
-    r = await fetch(API + '/' + path, {
-      method: body ? 'POST' : 'GET', cache: 'no-store',
-      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(st.token ? { Authorization: 'Bearer ' + st.token } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch { const e = new Error('Нет связи с сервером посещаемости'); e.offline = true; throw e; }
-  let data = null;
-  try { data = await r.json(); } catch { /* пусто */ }
-  if (!r.ok) {
-    const e = new Error((data && data.error) || `Сервер ответил ${r.status}`);
-    e.status = r.status;
-    if (r.status === 401 && path !== 'login') { st.token = ''; store.set(TOKEN_KEY, null); setTimeout(() => login('Вход истёк — введи пароль ещё раз.'), 0); }
+  try { return await backend(path, body); } catch (e) {
+    if (e.offline) e.message = 'Нет связи с интернетом';
+    if (e.status === 401 && path !== 'login') { logout(); setTimeout(() => login('Вход истёк — введи пароль ещё раз.'), 0); }
     throw e;
   }
-  return data;
 }
 
 /** Пары дня по реальному расписанию группы курса: {pairs: [n], titles: {n: предмет}} */
@@ -117,7 +104,7 @@ function weekView() {
 function setMarks(list) { // [{sid, iso, p, v}]
   for (const x of list) st.pending.set(pKey(x.sid, x.iso, x.p), x.v);
   st.saveErr = '';
-  scheduleSave(500);
+  scheduleSave(1500); // реже — меньше коммитов в GitHub
   renderContent();
   renderStatus();
 }
@@ -203,8 +190,10 @@ function login(error = '') {
         <p class="college">Пароль выдаёт администратор. Отметки видны только здесь — на сайт и в приложения они не попадают.</p>
         <label class="lbl" for="attpw">Пароль</label>
         <input id="attpw" type="password" autocomplete="current-password" placeholder="Пароль">
+        <label class="college" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="remember"> Запомнить на этом устройстве (1 день)</label>
         ${error ? `<p class="warn" style="margin-top:10px">${esc(error)}</p>` : ''}
         <button class="btn" data-login style="margin-top:12px;width:100%">Войти</button>
+        <p class="college" style="margin-top:12px">На чужом устройстве галочку не ставь. <a href="setup.html">Настройка</a> — для администратора.</p>
       </div>
     </main>`;
   const input = $app.querySelector('#attpw');
@@ -214,8 +203,7 @@ function login(error = '') {
     const btn = $app.querySelector('[data-login]');
     btn.disabled = true; btn.textContent = 'Проверяю…';
     try {
-      const r = await api('login', { password: pw });
-      st.token = r.token; store.set(TOKEN_KEY, r.token);
+      await api('login', { password: pw, remember: $app.querySelector('#remember').checked });
       boot();
     } catch (e) { login(e.status === 401 ? 'Неверный пароль' : e.message); }
   };
@@ -225,8 +213,7 @@ function login(error = '') {
 }
 
 async function boot() {
-  st.token = store.get(TOKEN_KEY) || ''; // общий вход с «Изменением расписания»
-  if (!st.token) return login();
+  if (!loggedIn()) return login(); // общий вход с «Изменением расписания»
   $app.innerHTML = `<main class="admin"><div class="card">Загружаю…</div></main>`;
   try {
     const [me, config] = await Promise.all([api('me'), api('config')]);
@@ -306,7 +293,7 @@ function shell() {
     </div>`;
   $app.querySelector('[data-logout]').onclick = () => {
     if (st.pending.size && !confirm('Не все отметки сохранены. Выйти всё равно?')) return;
-    st.token = ''; store.set(TOKEN_KEY, null); st.pending.clear(); login();
+    logout(); st.pending.clear(); login();
   };
   $app.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { st.course = b.dataset.c; savePrefs(); st.panel = st.panel === 'settings' ? st.panel : ''; renderNav(); renderPanel(); loadWeek(); }; });
   $app.querySelector('[data-mprev]').onclick = () => goMonth(-1);

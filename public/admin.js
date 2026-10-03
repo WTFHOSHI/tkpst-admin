@@ -1,14 +1,12 @@
-// Админ-панель → «Изменение расписания». Сохранение идёт через закрытый сервер (Netlify): он правит web/overrides.json
-// в репозитории. Вход — по тем же паролям, что и «Посещаемость» (администратор, староста, куратор).
+// Админ-панель → «Изменение расписания». Сохранение — прямо в web/overrides.json репозитория tkpst-schedule
+// (ключ GitHub лежит в зашифрованном сейфе, см. backend.js). Вход — по тем же паролям, что и «Посещаемость».
 // Сайт и приложения (Android/iOS) скачивают overrides.json сами — обновлять их не нужно.
 import { T, fmt, buildTimeline, setOverrides, pairSlots, parseLessons } from './js/core.js?v=__V__';
+import { api, loggedIn, logout } from './backend.js?v=__V__';
 
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const SERVER = '/api'; // админка и сервер на одном адресе
 const SCHED = (LOCAL ? '/sched' : 'https://api.thisishyum.ru/schedule_api/tyumen') + '/groups/196/schedules';
 const WD = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-const TOKEN_KEY = 'att_token';      // общий вход с «Посещаемостью»
-const OLD_GH_KEY = 'admin_token';   // старый ключ GitHub в этом браузере (если был)
 
 const $app = document.getElementById('app');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -21,30 +19,6 @@ const I = { back: svg('<path d="M15 18l-6-6 6-6"/>'), next: svg('<path d="M9 18l
   let theme = 'system';
   try { theme = JSON.parse(localStorage.getItem('theme')) || 'system'; } catch { /* ignore */ }
   document.documentElement.dataset.theme = theme;
-}
-
-const lsGet = (k) => { try { return localStorage.getItem(k) || ''; } catch { return ''; } };
-const lsSet = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* ignore */ } };
-const tokenGet = () => lsGet(TOKEN_KEY);
-const tokenSet = (t) => lsSet(TOKEN_KEY, t);
-
-async function api(path, body) {
-  let r;
-  try {
-    r = await fetch(SERVER + '/' + path, {
-      method: body ? 'POST' : 'GET', cache: 'no-store',
-      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(tokenGet() ? { Authorization: 'Bearer ' + tokenGet() } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch { const e = new Error('Нет связи с сервером'); e.status = 0; throw e; }
-  let data = null;
-  try { data = await r.json(); } catch { /* пусто */ }
-  if (!r.ok) {
-    const e = new Error((data && data.error) || `Сервер ответил ${r.status}`);
-    e.status = r.status; e.code = data && data.code;
-    throw e;
-  }
-  return data;
 }
 
 let me = { role: '', title: '' };
@@ -114,8 +88,10 @@ function login(error = '') {
         <p class="college">Тот же пароль, что и в «Посещаемости»: администратор, староста или куратор.</p>
         <label class="lbl" for="pw">Пароль</label>
         <input id="pw" type="password" autocomplete="current-password" placeholder="Пароль">
+        <label class="college" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="remember"> Запомнить на этом устройстве (1 день)</label>
         ${error ? `<p class="warn" style="margin-top:10px">${esc(error)}</p>` : ''}
         <button class="btn" data-login style="margin-top:12px;width:100%">Войти</button>
+        <p class="college" style="margin-top:12px">На чужом устройстве галочку не ставь. <a href="setup.html">Настройка</a> — для администратора.</p>
       </div>
     </main>`;
   const input = $app.querySelector('#pw');
@@ -124,7 +100,7 @@ function login(error = '') {
     if (!pw) return;
     const btn = $app.querySelector('[data-login]');
     btn.disabled = true; btn.textContent = 'Проверяю…';
-    try { const r = await api('login', { password: pw }); tokenSet(r.token); boot(); }
+    try { await api('login', { password: pw, remember: $app.querySelector('#remember').checked }); boot(); }
     catch (e) { login(e.status === 401 ? 'Неверный пароль' : e.message); }
   };
   $app.querySelector('[data-login]').onclick = go;
@@ -132,54 +108,15 @@ function login(error = '') {
   input.focus();
 }
 
-/** Один раз: подключить ключ GitHub к серверу (дальше все входят по паролям). */
-function connectGithub(error = '') {
-  const canSet = me.role === 'admin' || me.role === 'starosta';
-  const old = lsGet(OLD_GH_KEY);
-  $app.innerHTML = `
-    <header class="bar"><span class="icon-space"></span>
-      <div class="bar-title"><div class="t">Админ-панель</div><div class="s">ИС-25-3С · ${esc(me.title)}</div></div>
-      <div class="bar-actions"><button class="icon" data-logout aria-label="Выйти">${I.out}</button></div></header>
-    <main class="admin">
-      <div class="card">
-        <b>Нужно один раз подключить GitHub</b>
-        <p class="college">Изменения расписания сохраняются в файл сайта на GitHub. Ключ хранится на закрытом сервере —
-          после подключения староста, куратор и ты заходите сюда просто по паролям.</p>
-        ${!canSet ? '<p class="warn">Подключить может администратор или староста. Попроси их зайти сюда один раз.</p>' : `
-          ${old ? `<button class="btn" data-old style="width:100%;margin:6px 0 12px">Подключить ключ, который уже сохранён в этом браузере</button>` : ''}
-          <label class="lbl" for="ghk">${old ? 'Или вставь ключ' : 'Ключ GitHub (fine-grained token)'}</label>
-          <input id="ghk" type="password" autocomplete="off" placeholder="github_pat_…">
-          <button class="btn" data-set style="margin-top:12px;width:100%">Подключить</button>
-          <ol class="steps">
-            <li>Открой <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com → Settings → Fine-grained tokens → Generate new token</a>.</li>
-            <li>Repository access → <b>Only select repositories</b> → <b>tkpst-schedule</b>.</li>
-            <li>Permissions → Repository permissions → <b>Contents: Read and write</b>.</li>
-            <li>Generate token → скопируй и вставь сюда.</li>
-          </ol>`}
-        ${error ? `<p class="warn" style="margin-top:10px">${esc(error)}</p>` : ''}
-      </div>
-    </main>`;
-  $app.querySelector('[data-logout]').onclick = () => { tokenSet(''); login(); };
-  const send = async (token, btn) => {
-    btn.disabled = true; btn.textContent = 'Проверяю ключ…';
-    try { await api('github', { token }); lsSet(OLD_GH_KEY, ''); boot(); }
-    catch (e) { connectGithub(e.message); }
-  };
-  const ob = $app.querySelector('[data-old]'); if (ob) ob.onclick = () => send(old, ob);
-  const sb = $app.querySelector('[data-set]');
-  if (sb) sb.onclick = () => { const v = $app.querySelector('#ghk').value.trim(); if (v) send(v, sb); };
-}
-
 async function boot() {
-  if (!tokenGet()) return login();
+  if (!loggedIn()) return login();
   $app.innerHTML = `<main class="admin"><div class="card">Загружаю…</div></main>`;
   try {
     me = await api('me');
     await pull();
     editor();
   } catch (e) {
-    if (e.status === 401) { tokenSet(''); return login('Вход истёк — введи пароль ещё раз.'); }
-    if (e.code === 'no_github') return connectGithub();
+    if (e.status === 401) { logout(); return login('Вход истёк — введи пароль ещё раз.'); }
     $app.innerHTML = `<main class="admin"><div class="card warn">Не удалось загрузить: ${esc(e.message)}</div><button class="btn" data-retry>Ещё раз</button></main>`;
     $app.querySelector('[data-retry]').onclick = boot;
   }
@@ -237,7 +174,7 @@ function editor() {
     <div class="savebar"><span class="status-text" data-status></span><button class="btn" data-save>Сохранить</button></div>`;
   $app.querySelector('[data-logout]').onclick = () => {
     if (dirty() && !confirmLeave()) return;
-    tokenSet(''); login();
+    logout(); login();
   };
   $app.querySelector('#ann').oninput = (e) => { st.data.announcement = e.target.value; status(); };
   $app.querySelector('[data-prev]').onclick = () => shiftWeek(-1);
