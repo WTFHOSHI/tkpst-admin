@@ -35,7 +35,7 @@
 .small-btn:active { background: var(--card-high); }
 .preview .pv { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--outline); font-size: 14px; }
 .preview .pv:last-child { border-bottom: 0; }
-.preview .pv .n { width: 72px; flex: none; color: var(--muted); }
+.preview .pv .n { width: 104px; flex: none; color: var(--muted); }
 .warn { background: var(--tertiary-c); color: var(--on-tertiary-c); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 .ok { background: var(--primary-c); color: var(--on-primary-c); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 ol.steps { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 1.45; }
@@ -166,4 +166,33 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
   .att-h .small-btn { font-size: 12px; padding: 3px 6px; }
   .att-name .nm { font-size: 15px; }
   .att-cell { height: 44px; }
+}
+
+/* Расписание звонков */
+.bells { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.bell-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bell-row b { width: 64px; flex: none; }
+.admin input[type=time], .admin input[type=number] {
+  font: inherit; font-size: 15px; color: var(--text); background: var(--bg); border: 1px solid var(--outline);
+  border-radius: 10px; padding: 7px 8px; min-width: 0;
+}
+.admin input[type=time]:focus, .admin input[type=number]:focus { border-color: var(--primary); outline: none; }
+.bell-gap { display: flex; align-items: center; gap: 6px; padding: 2px 0 2px 72px; color: var(--muted); font-size: 13px; }
+.bell-gap input[type=number] { width: 70px; padding: 4px 8px; font-size: 14px; }
+.bell-big { color: var(--tertiary); font-weight: 600; }
+.bell-actions { margin-top: 8px; }
+.small-btn:disabled { opacity: .45; }
+.ch-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border-radius: 12px;
+  background: var(--tertiary-c); color: var(--on-tertiary-c); margin-top: 6px; }
+.ch-row .ch-name { font-weight: 600; min-width: 130px; }
+.ch-row input[type=time] { padding: 4px 6px; }
+.ch-row .small-btn { color: inherit; text-decoration: underline; }
+.ch-day { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.ch-day .ch-row { margin-top: 0; }
+.preview .pv.ch { background: var(--tertiary-c); color: var(--on-tertiary-c); border-radius: 10px; padding: 6px 8px; border-bottom: 0; margin: 3px 0; }
+.preview .pv.ch .n { color: inherit; }
+@media (max-width: 420px) {
+  .bell-gap { padding-left: 0; }
+  .bell-row b { width: auto; }
+  .ch-row .ch-name { min-width: 0; }
 }
