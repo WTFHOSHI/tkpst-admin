@@ -264,7 +264,7 @@ function select(day) {
  * Начало сдвигает пару целиком (длина та же), конец меняет длину, перерыв сдвигает все следующие пары.
  * Поля обновляются на месте — фокус при вводе не теряется.
  */
-function timesEditor(box, slots, onChange) {
+function timesEditor(box, slots, onChange, chs = []) {
   const cur = slots.map((x) => ({ ...x }));
   box.innerHTML = `<div class="bells">${cur.map((x, i) => `
     ${i ? `<div class="bell-gap"><span>перерыв</span><input type="number" min="0" max="300" step="5" inputmode="numeric" data-gap="${i}"><span>мин</span><span class="bell-big" data-gk="${i}"></span></div>` : ''}
@@ -285,7 +285,12 @@ function timesEditor(box, slots, onChange) {
         const gap = x.start - cur[i - 1].end;
         const g = q(`[data-gap="${i}"]`);
         if (g !== except) g.value = String(gap);
-        q(`[data-gk="${i}"]`).textContent = gap >= 25 ? 'большой' : '';
+        // Классный час / флаг внутри промежутка — это не перерыв.
+        const inside = chs.filter((c) => c.start >= cur[i - 1].end && c.end <= x.start);
+        q(`[data-gk="${i}"]`).textContent = inside.length
+          ? `из них ${inside.map((c) => `${c.name} ${hmStr(c.start)}–${hmStr(c.end)}`).join(', ')}`
+          : gap >= 25 ? 'большой' : '';
+        q(`[data-gk="${i}"]`).classList.toggle('in-ch', inside.length > 0);
         if (gap < 0) problems.push(`${x.number} пара начинается раньше, чем кончается ${cur[i - 1].number}`);
       }
     });
@@ -353,7 +358,7 @@ function renderBells() {
     (st.data.bells ||= {})[kind] = toStr(ns);
     const rb = box.querySelector('[data-reset-kind]'); if (rb) rb.disabled = !(normalize(st.data).bells || {})[kind];
     bellsChanged();
-  });
+  }, kind === 'mon' ? [{ name: 'классный час', start: ch.start, end: ch.end }, { name: 'флаг', start: fl.start, end: fl.end }] : []);
   box.querySelector('[data-reset-kind]').onclick = () => { if (st.data.bells) delete st.data.bells[kind]; renderBells(); bellsChanged(); };
   for (const k of ['flag', 'classHour']) {
     const a = box.querySelector(`[data-chs="${k}"]`), b = box.querySelector(`[data-che="${k}"]`);
@@ -507,7 +512,8 @@ async function renderDay() {
         if (el && x.end > x.start) el.textContent = `${hm(x.start)}–${hm(x.end)}`;
       }
       changed(false);
-    });
+    }, withOv(nd, () => buildTimeline(wd, col.lessons, k)).filter((e) => e.type === 'ch')
+      .map((e) => ({ name: e.kind === 'flag' ? 'флаг' : 'классный час', start: e.start, end: e.end })));
   }
   box.querySelectorAll('.prow').forEach((row) => {
     const n = Number(row.dataset.n);
