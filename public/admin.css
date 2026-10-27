@@ -47,6 +47,41 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .admin-tabs a.on { background: var(--primary); color: var(--on-primary); }
 .admin-tabs + #app .bar { padding-top: 6px; }
 
+/* Личные кабинеты: список аккаунтов и подтверждение принадлежности студенту. */
+.users-main { max-width: 1080px; gap: 20px; }
+.users-main h1, .users-login h1 { margin: 8px 0 0; font-size: 26px; line-height: 1.2; }
+.users-login { max-width: 520px; padding-top: 32px; line-height: 1.5; }
+.users-login form { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.users-login form p { margin: 0 0 8px; }
+.users-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.users-heading .btn { flex: none; }
+.users-heading p { margin: 12px 0 0; max-width: 65ch; line-height: 1.5; }
+.users-search { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.users-search > div { display: flex; gap: 10px; }
+.users-search input { min-width: 0; }
+.users-tools, .user-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.users-summary { padding: 0 0 16px; color: var(--muted); font-size: 15px; }
+.users-summary strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.user-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.65fr); gap: 24px; padding: 24px 0; border-top: 1px solid var(--outline); }
+.user-row h2 { color: var(--text); margin: 0 0 6px; font-size: 18px; overflow-wrap: anywhere; }
+.user-identity p { margin: 6px 0; overflow-wrap: anywhere; }
+.user-link-status { margin: 0 0 12px; line-height: 1.5; font-size: 14px; }
+.user-link select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+.user-actions { margin-top: 12px; }
+.user-row [data-row-status] { margin: 8px 0 0; line-height: 1.5; }
+.users-empty { padding: 36px 0; border-top: 1px solid var(--outline); }
+.users-empty h2 { margin: 0 0 12px; color: var(--text); }
+.users-main .btn, .users-login .btn { min-height: 44px; }
+.users-main button:disabled, .users-login button:disabled { opacity: .55; cursor: wait; }
+.users-main button:focus-visible, .users-main select:focus-visible, .users-login input:focus-visible, .users-login button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.users-main button:hover:not(:disabled), .users-login button:hover:not(:disabled) { filter: brightness(.94); }
+@media (max-width: 620px) {
+  .user-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .users-heading { gap: 12px; }
+  .users-main h1 { font-size: 23px; }
+  .admin-tabs a { min-width: 0; font-size: 13px; padding: 12px 4px; }
+}
+
 /* ---------- Посещаемость ---------- */
 :root {
   --mP: #C6EFCE; --mPt: #006100; --mN: #FFC7CE; --mNt: #9C0006; --mB: #FFEB9C; --mBt: #7A4A00;

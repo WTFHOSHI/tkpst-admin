@@ -118,6 +118,7 @@ export const loggedIn = () => !!session();
 export const currentRole = () => (session() ? S.role : '');
 
 export function logout() {
+  globalThis.dispatchEvent?.(new Event('admin-logout'));
   S = null; dataKey = null;
   ls(SESSION_KEY, null, localStorage);
   ls(SESSION_KEY, null, sessionStorage);
