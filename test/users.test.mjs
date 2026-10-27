@@ -6,7 +6,7 @@ test('users: token is sent only to fixed API, never cookies, logout revokes and 
   const calls = [];
   const client = createUsersClient(async (url, init) => { calls.push({ url, init }); return Response.json(url.endsWith('/login') ? { token: 'secret-token' } : { users: [] }); });
   await client.login('admin password'); await client.request('users', {});
-  assert.equal(calls[1].url, 'https://tkpst-schedule.vercel.app/api/admin/users');
+  assert.equal(calls[1].url, 'https://tkpst-api.onrender.com/api/admin/users');
   assert.equal(calls[1].init.headers.Authorization, 'Bearer secret-token');
   assert.equal(calls[1].init.credentials, 'omit');
   assert.equal(calls[1].init.cache, 'no-store');

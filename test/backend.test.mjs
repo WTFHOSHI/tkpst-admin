@@ -11,11 +11,15 @@ const files = new Map();     // 'repo/path' → {text, sha}
 let shaN = 0;
 let vaultText = null;
 let cloudLogins = 0;
+let cloudBlocked = false;
+let deferCloud = false, releaseCloud;
 const cloudToken = 'a'.repeat(43);
 const commits = [];
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, headers: new Map() });
 globalThis.fetch = async (url, init = {}) => {
-  if (String(url).startsWith('https://tkpst-schedule.vercel.app/api/admin/')) {
+  if (String(url).startsWith('https://tkpst-api.onrender.com/api/admin/')) {
+    if (cloudBlocked) return new Promise(() => {});
+    if (deferCloud && url.endsWith('/login')) return new Promise(resolve => { releaseCloud = resolve; });
     if (url.endsWith('/login')) { cloudLogins++; return reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }); }
     assert.equal(init.headers.Authorization, 'Bearer ' + cloudToken);
     return reply(200, { ok: true });
@@ -78,9 +82,9 @@ test('общий вход: admin server session is persisted with vault role and
   await B.api('login', { password: passwords.admin, remember: true });
   assert.equal(cloudLogins, before + 1);
   const saved = JSON.parse(localStorage.getItem('admin_session'));
-  assert.equal(saved.cloud.token, cloudToken);
   assert.ok(!JSON.stringify(saved).includes(passwords.admin));
   await B.usersApi('users'); assert.equal(cloudLogins, before + 1);
+  assert.equal(JSON.parse(localStorage.getItem('admin_session')).cloud.token, cloudToken);
   const reloaded = await import('../public/backend.js?shared-session-reload');
   assert.equal(reloaded.panelReady(), true);
   await reloaded.usersApi('users'); assert.equal(cloudLogins, before + 1, 'reload reuses saved bearer');
@@ -89,6 +93,28 @@ test('общий вход: admin server session is persisted with vault role and
   await B.api('login', { password: passwords.kurator });
   assert.equal(cloudLogins, before + 1, 'curator uses existing vault only');
   await assert.rejects(B.usersApi('users'), e => e.status === 403);
+  await B.api('login', { password: passwords.admin });
+});
+test('blocked LK server never blocks vault login, schedule or attendance', async () => {
+  B.logout(); cloudBlocked = true;
+  try {
+    const login = await Promise.race([B.api('login', { password: passwords.admin }), new Promise((_, reject) => setTimeout(() => reject(new Error('login blocked by LK')), 100))]);
+    assert.equal(login.role, 'admin'); assert.equal(B.panelReady(), true);
+    assert.equal((await B.api('me')).role, 'admin');
+    assert.ok((await B.api('config')).courses);
+  } finally { B.logout(); cloudBlocked = false; }
+  await B.api('login', { password: passwords.admin });
+});
+test('background LK completion preserves unchecked remember choice despite another tab', async () => {
+  deferCloud = true;
+  try {
+    await B.api('login', { password: passwords.admin, remember: false });
+    localStorage.setItem('admin_session', JSON.stringify({ role: 'kurator', gh: 'other-tab', dk: 'other-key' }));
+    releaseCloud(reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }));
+    await B.usersApi('users');
+    assert.equal(JSON.parse(localStorage.getItem('admin_session')).role, 'kurator');
+    assert.equal(JSON.parse(sessionStorage.getItem('admin_session')).cloud.token, cloudToken);
+  } finally { deferCloud = false; B.logout(); }
   await B.api('login', { password: passwords.admin });
 });
 test('общий вход: expiry returns active Users to the shared login instead of a retry loop', async () => {
@@ -168,4 +194,20 @@ test('одновременные записи не теряются', async () =
   const sid = 'sX';
   await Promise.all([1, 2, 3].map((p) => B.api('marks', { course: '1', w: '2026-09-14', changes: [{ s: sid, d: '2026-09-15', p, v: 'P' }] })));
   assert.deepEqual(Object.keys((await B.api('week?course=1&w=2026-09-14')).m[sid]['2026-09-15']).sort(), ['1', '2', '3']);
+});
+test('student permanent deletion is admin-only, confirmed and cannot be restored', async () => {
+  await B.api('login', { password: passwords.admin });
+  const cfg = await B.api('students', { course: '2', action: 'add', name: 'Удаляемый Тестовый Студент' });
+  const student = cfg.courses[2].students.find(s => s.name === 'Удаляемый Тестовый Студент');
+  const body = { course: '2', action: 'delete', id: student.id, confirmName: student.name, to: '2026-10-26' };
+  await B.api('login', { password: passwords.kurator });
+  await assert.rejects(B.api('students', body), e => e.status === 403);
+  await B.api('login', { password: passwords.admin });
+  await assert.rejects(B.api('students', { ...body, confirmName: 'Неверное имя' }));
+  const next = await B.api('students', body);
+  const tombstone = next.courses[2].students.find(s => s.id === student.id);
+  assert.equal(tombstone.name, 'Удалённый студент'); assert.equal(tombstone.deleted, true);
+  assert.equal(tombstone.to, '2026-10-26');
+  assert.ok(!JSON.stringify(next).includes(student.name));
+  await assert.rejects(B.api('students', { course: '2', action: 'restore', id: student.id }));
 });

@@ -1,9 +1,11 @@
 import { usersMarkup } from './users-client.js?v=__V__';
 import { usersApi, syncUsers, currentRole, panelReady, logout } from './backend.js?v=__V__';
 import { showPanelLogin, panelIcon } from './login-view.js?v=__V__';
+import { showDeleteConfirmation } from './delete-confirm.js?v=__V__';
 
 let host, version = 0, controller, last = null, offset = 0, search = '', status = 'all', loadNumber = 0;
 let initialSyncRequired = true;
+let stopReconnect = null;
 const valid = v => v === version && location.hash === '#users';
 const message = (text, error = false) => {
   const el = host?.querySelector('[data-users-message]');
@@ -32,7 +34,7 @@ async function load(sync = false) {
   const v = version, number = ++loadNumber, list = host.querySelector('[data-users-list]'); if (!list) return;
   const focused = host.contains(document.activeElement) && document.activeElement.closest('[data-users-list]');
   list.setAttribute('aria-busy', 'true'); message(''); last = null;
-  list.innerHTML = '<div class="users-loading" role="status"><span class="users-loading-mark" aria-hidden="true"></span>Загружаем аккаунты…</div>';
+  list.innerHTML = '<div class="users-loading" role="status"><span class="users-loading-mark" aria-hidden="true"></span><span>Подключаем личные кабинеты…<br><span class="college">Бесплатный сервер может запускаться около минуты. Расписание и посещаемость доступны в соседних вкладках.</span></span></div>';
   try {
     if (sync || initialSyncRequired) { await syncUsers(controller.signal); if (!valid(v) || number !== loadNumber) return; initialSyncRequired = false; }
     const data = await usersApi('users', { search, offset, status }, controller.signal);
@@ -44,15 +46,29 @@ async function load(sync = false) {
     for (const row of list.querySelectorAll('[data-user]')) {
       row.querySelector('[data-link]').onclick = () => confirmLink(row, false);
       row.querySelector('[data-unlink]')?.addEventListener('click', () => confirmLink(row, true));
+      row.querySelector('[data-delete-user]').onclick = () => deleteAccount(row);
       row.querySelector('[data-student]').onchange = () => { row.querySelector('[data-row-confirm]').hidden = true; row.querySelector('[data-row-status]').textContent = ''; };
     }
     if (focused) { list.tabIndex = -1; list.focus({ preventScroll: true }); }
   } catch (error) {
     if (!valid(v) || number !== loadNumber || error.name === 'AbortError') return;
     list.setAttribute('aria-busy', 'false'); message(error.message, true);
+    if (error.code === 'cloud_unavailable') {
+      list.innerHTML = '<div class="users-empty"><h2>Личные кабинеты временно недоступны</h2><p>Основной вход в админку работает. Для повторного подключения ЛК введите пароль ещё раз; расписание и посещаемость доступны без переподключения.</p><button class="btn outline" data-users-reconnect>Подключить личные кабинеты</button><a class="btn outline" href="#att">К посещаемости</a></div>';
+      list.querySelector('[data-users-reconnect]').onclick = () => { version++; controller.abort(); const v = version; stopReconnect = showPanelLogin(host, () => { if (valid(v)) users.start(host); }, 'Повторный вход подключит личные кабинеты. Основные разделы уже доступны.'); };
+      return;
+    }
     list.innerHTML = '<div class="users-empty"><h2>Не удалось загрузить аккаунты</h2><p>Проверьте соединение и повторите запрос.</p><button class="btn outline" data-users-retry>Попробовать снова</button></div>';
     list.querySelector('[data-users-retry]').onclick = () => load();
   }
+}
+function deleteAccount(row) {
+  const user = last?.users.find(u => u.id === row.dataset.user); if (!user) return;
+  const v = version;
+  showDeleteConfirmation({ container: row.querySelector('[data-row-confirm]'), title: 'Удалить аккаунт @' + user.username + '?', expected: user.username, label: 'Для подтверждения введите логин', description: 'Аккаунт будет удалён, его сеансы завершатся, а привязка к студенту снимется. Студент и отметки в «Посещаемости» останутся. Восстановить аккаунт нельзя.', onCancel: () => row.querySelector('[data-delete-user]').focus(), onDelete: async confirmUsername => {
+    await usersApi('delete-user', { userId: user.id, confirmUsername }, controller.signal);
+    if (valid(v)) { if (last?.users.length === 1 && offset > 0) offset = Math.max(0, offset - 100); await load(); message('Аккаунт @' + user.username + ' удалён. Его сеансы завершены.'); }
+  } });
 }
 function confirmLink(row, unlink) {
   const user = last?.users.find(u => u.id === row.dataset.user), value = row.querySelector('[data-student]').value;
@@ -77,6 +93,7 @@ function confirmLink(row, unlink) {
 export const users = {
   dirty: () => false,
   start(element) {
+    stopReconnect?.(); stopReconnect = null;
     host = element; version++; controller = new AbortController();
     offset = 0; search = ''; status = 'all'; initialSyncRequired = true;
     if (!panelReady()) { showPanelLogin(host, () => users.start(host)); return; }
@@ -85,5 +102,5 @@ export const users = {
     }
     shell(); load(true);
   },
-  stop() { version++; controller?.abort(); last = null; },
+  stop() { version++; controller?.abort(); stopReconnect?.(); stopReconnect = null; last = null; },
 };

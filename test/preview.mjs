@@ -20,6 +20,7 @@ const server = createServer(async (req, res) => {
   if (path === '/vault.json') return json(200, vault);
   if (path.startsWith('/sched')) return json(200, []);
   if (path.startsWith('/qa-github/')) {
+    if (req.method === 'PUT' && path.endsWith('/config.json')) { const chunks = []; for await (const chunk of req) chunks.push(chunk); const payload = JSON.parse(Buffer.concat(chunks).toString()); const encrypted = JSON.parse(Buffer.from(payload.content, 'base64').toString()); const { createDecipheriv } = await import('node:crypto'); const c = createDecipheriv('aes-256-gcm', dk, Buffer.from(encrypted.iv, 'base64')); c.setAAD(Buffer.from('data:config.json')); const ct = Buffer.from(encrypted.ct, 'base64'); c.setAuthTag(ct.subarray(-16)); Object.assign(config, JSON.parse(Buffer.concat([c.update(ct.subarray(0, -16)), c.final()]).toString())); return json(200, { content: { sha: 'qa-config-updated' } }); }
     if (path.endsWith('/config.json')) return json(200, { content: Buffer.from(encryptedConfig()).toString('base64'), sha: 'qa-config' });
     if (path.endsWith('/overrides.json')) return json(200, { content: Buffer.from('{}').toString('base64'), sha: 'qa-overrides' });
     if (!path.includes('/contents/')) return json(200, { permissions: { push: true } });
@@ -31,13 +32,14 @@ const server = createServer(async (req, res) => {
     if (req.headers.authorization !== 'Bearer ' + token) return json(401, { error: 'Нужен тестовый вход' });
     if (path.endsWith('/users')) { const list = users.filter(u => (!body.search || (u.displayName + u.username).toLowerCase().includes(body.search.toLowerCase())) && (!body.status || body.status === 'all' || (body.status === 'linked' ? !!u.student : !u.student))); return json(200, { users: list, students, total: list.length, nextOffset: null, syncedAt: Date.now() }); }
     if (path.endsWith('/link')) { const user = users.find(u => u.id === body.userId); user.student = students.find(s => s.id === body.studentId) || null; user.link = user.student ? { course: body.course, studentId: body.studentId } : null; return json(200, { ok: true }); }
+    if (path.endsWith('/delete-user')) { const index = users.findIndex(u => u.id === body.userId && u.username === body.confirmUsername); if (index < 0) return json(404, { error: 'Не найден' }); users.splice(index, 1); return json(200, { ok: true }); }
     if (path.endsWith('/sync/start')) return json(200, { ticket: 't'.repeat(43) });
     return json(200, { ok: true });
   }
   try {
     const file = resolve(root, '.' + (path === '/' ? '/index.html' : path)); if (!file.startsWith(resolve(root) + '\\') && !file.startsWith(resolve(root) + '/')) return json(403, {});
     let data = await readFile(file); const ext = extname(file);
-    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-schedule.vercel.app/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
+    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-api.onrender.com/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
     if (ext === '.html') data = Buffer.from(data.toString().replace('<body>', '<body><aside style="text-align:center;padding:6px;font-size:12px">Тестовый стенд · демонстрационные данные</aside>'));
     res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' })[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(data);
   } catch { json(404, {}); }

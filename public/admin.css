@@ -100,8 +100,20 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .user-link select { width: 100%; min-width: 0; min-height: 46px; padding: 10px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
 .user-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .user-actions .btn { min-height: 44px; font-size: 14px; padding: 10px 14px; }
-.user-confirm { margin-top: 16px; padding: 14px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); }
+.user-confirm { margin-top: 16px; padding: 14px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); scroll-margin-top: 80px; scroll-margin-bottom: 180px; }
 .user-confirm[hidden] { display: none; }
+.delete-link { color: var(--delete-ink); min-height: 44px; }
+.user-link > .delete-link { margin-top: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.delete-confirm-form h3 { margin: 0 0 10px; font-size: 16px; color: var(--text); }
+.delete-confirm-form > p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; }
+.delete-confirm-form input { min-height: 46px; width: 100%; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--outline); border-radius: 12px; padding: 10px 12px; }
+.delete-confirm-form input:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.delete-confirm-form .btn.delete-action { color: var(--delete-on); background: var(--delete-ink); }
+.student-row-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+:root { --delete-ink: #a5211b; --delete-on: #fff; }
+:root[data-theme="dark"] { --delete-ink: #ffb4ab; --delete-on: #601410; }
+@media (prefers-color-scheme: dark) { :root[data-theme="system"] { --delete-ink: #ffb4ab; --delete-on: #601410; } }
+@media (max-width: 620px) { .att-srow { flex-wrap: wrap; } .student-row-actions { width: 100%; } .student-row-actions button { min-height: 44px; } }
 .user-confirm p { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .user-row-status { margin: 10px 0 0; line-height: 1.5; }
 .user-row-status:empty { display: none; }

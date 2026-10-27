@@ -1,4 +1,5 @@
 import { showPanelLogin } from './login-view.js?v=__V__';
+import { showDeleteConfirmation } from './delete-confirm.js?v=__V__';
 // Вкладка «Посещаемость» админ-панели. Данные — в приватном репозитории tkpst-admin-data, зашифрованы (см. backend.js):
 // сайт расписания и приложения Android/iOS их не видят.
 import { T, buildTimeline, setOverrides, parseLessons } from './js/core.js?v=__V__';
@@ -6,7 +7,7 @@ import {
   MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
   weeksOfMonth, monthOfWeek, activeStudents, dayPairs, studentTotals, attendanceWorkbook, buildXlsx, parseOldXlsx,
 } from './att-core.js?v=__V__';
-import { api as backend, loggedIn, logout } from './backend.js?v=__V__';
+import { api as backend, loggedIn, logout, syncUsers } from './backend.js?v=__V__';
 
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname); // локальная проверка
 const SCHED = LOCAL ? '/sched' : 'https://api.thisishyum.ru/schedule_api/tyumen';
@@ -519,13 +520,16 @@ async function doExport(kind, btn) {
 
 function studentsPanel(box) {
   const c = course();
-  const active = c.students.filter((s) => !s.to), gone = c.students.filter((s) => s.to);
+  const selectedCourse = st.course;
+  const active = c.students.filter((s) => !s.to && !s.deleted), gone = c.students.filter((s) => s.to && !s.deleted);
   box.innerHTML = `<div class="card att-panel">
     <b>Студенты · ${esc(courseTitle())}</b>
     <div class="att-add"><input type="text" data-newname placeholder="Фамилия Имя Отчество"><button class="btn" data-add>Добавить</button></div>
     <div class="att-slist">${active.map((s, i) => `<div class="att-srow"><span class="no">${i + 1}</span><span class="nm">${esc(s.name)}${s.from ? ` <span class="college">с ${dMon(s.from)}</span>` : ''}</span>
-      <button class="small-btn" data-ren="${s.id}">Изменить</button><button class="small-btn danger" data-rm="${s.id}">Убрать</button></div>`).join('') || '<p class="college">Пока никого.</p>'}</div>
-    ${gone.length ? `<b style="display:block;margin-top:12px">Убраны из списка</b><div class="att-slist">${gone.map((s) => `<div class="att-srow"><span class="nm">${esc(s.name)} <span class="college">до ${dMon(s.to)}</span></span><button class="small-btn" data-back="${s.id}">Вернуть</button></div>`).join('')}</div>` : ''}
+      <span class="student-row-actions"><button class="small-btn" data-ren="${s.id}">Изменить</button><button class="small-btn" data-rm="${s.id}">Убрать</button>${st.role === 'admin' ? `<button class="small-btn delete-link" data-delete-student="${esc(s.id)}">Удалить</button>` : ''}</span></div>`).join('') || '<p class="college">Пока никого.</p>'}</div>
+    ${gone.length ? `<b style="display:block;margin-top:12px">Убраны из списка</b><div class="att-slist">${gone.map((s) => `<div class="att-srow"><span class="nm">${esc(s.name)} <span class="college">до ${dMon(s.to)}</span></span><span class="student-row-actions"><button class="small-btn" data-back="${s.id}">Вернуть</button>${st.role === 'admin' ? `<button class="small-btn delete-link" data-delete-student="${esc(s.id)}">Удалить</button>` : ''}</span></div>`).join('')}</div>` : ''}
+    <p class="college">«Убрать» сохраняет возможность вернуть студента.${st.role === 'admin' ? ' «Удалить» убирает ФИО навсегда; прежние отметки остаются без имени.' : ''}</p>
+    <div class="user-confirm" data-student-delete-confirm hidden></div>
     <p class="warn" data-smsg hidden></p>
   </div>`;
   const op = async (body) => {
@@ -539,6 +543,20 @@ function studentsPanel(box) {
   box.querySelectorAll('[data-ren]').forEach((b) => { b.onclick = () => { const s = c.students.find((x) => x.id === b.dataset.ren); const n = prompt('ФИО:', s.name); if (n && n.trim() !== s.name) op({ action: 'rename', id: s.id, name: n }); }; });
   box.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => { const s = c.students.find((x) => x.id === b.dataset.rm); if (confirm(`Убрать ${s.name} из списка начиная с недели ${dMon(st.monday)}?`)) op({ action: 'remove', id: s.id, to: addDays(st.monday, -1) }); }; });
   box.querySelectorAll('[data-back]').forEach((b) => { b.onclick = () => op({ action: 'restore', id: b.dataset.back }); });
+  box.querySelectorAll('[data-delete-student]').forEach(button => { button.onclick = () => {
+    const student = c.students.find(s => s.id === button.dataset.deleteStudent); if (!student) return;
+    showDeleteConfirmation({ container: box.querySelector('[data-student-delete-confirm]'), title: 'Удалить студента навсегда?', expected: student.name, label: 'Для подтверждения введите ФИО', description: 'ФИО исчезнет из списка. Прошлые отметки сохранятся как «Удалённый студент». Привязка к ЛК снимется после синхронизации; сам аккаунт останется. Восстановить имя нельзя.', onCancel: () => button.focus(), onDelete: async confirmName => {
+      await flush(); if (st.pending.size) throw new Error('Сначала сохраните отметки посещаемости и повторите удаление.');
+      st.config = await api('students', { course: selectedCourse, action: 'delete', id: student.id, confirmName, to: todayIso() });
+      let syncError = '';
+      try { await syncUsers(); } catch (e) { syncError = e.message; }
+      if (st.course === selectedCourse && st.panel === 'students' && box.isConnected) {
+        studentsPanel(box); renderContent();
+        const note = box.querySelector('[data-smsg]'); note.hidden = false; note.className = syncError ? 'warn' : 'ok';
+        note.textContent = syncError ? 'Студент удалён из списка. Не удалось обновить ЛК: ' + syncError + ' Откройте «Пользователи» и обновите список студентов.' : 'Студент удалён. ФИО скрыто в истории, привязка к ЛК снята.';
+      }
+    } });
+  }; });
 }
 
 async function settingsPanel(box) {

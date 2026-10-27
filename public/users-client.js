@@ -1,25 +1,26 @@
-const API = 'https://tkpst-schedule.vercel.app/api/admin/';
+import { fetchJsonWithTimeout } from './network.js?v=__V__';
+const API = 'https://tkpst-api.onrender.com/api/admin/';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function createUsersClient(fetchImpl = fetch) {
   let token = null, expiresAt = 0, revision = 0;
   const clear = () => { token = null; expiresAt = 0; revision++; };
   async function request(path, body = {}, signal) {
-    if (!['login', 'users', 'link', 'logout', 'sync', 'sync/start'].includes(path)) throw new Error('Неизвестный адрес API.');
+    if (!['login', 'users', 'link', 'logout', 'sync', 'sync/start', 'delete-user'].includes(path)) throw new Error('Неизвестный адрес API.');
     const version = revision;
-    let response;
+    let response, data;
     try {
-      response = await fetchImpl(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(25_000)]) : AbortSignal.timeout(25_000) });
+      ({ response, data } = await fetchJsonWithTimeout(fetchImpl, API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'error', signal }, 65000));
     } catch (error) {
       if (error.name === 'AbortError') throw error;
       throw new Error('Нет связи с сервисом ЛК. Проверьте интернет и повторите.');
     }
-    const data = response.status === 204 ? {} : await response.json();
+    if (response.status !== 204 && (!data || typeof data !== 'object')) throw new Error('Сервис ЛК вернул неверный ответ. Попробуйте позже.');
     if (!response.ok) {
       if (response.status === 401 && version === revision) clear();
       const error = new Error(data.error || 'Не удалось выполнить запрос.'); error.status = response.status; throw error;
     }
-    return data;
+    return data || {};
   }
   return {
     request, clear, authorized: () => !!token && expiresAt > Date.now(),
@@ -57,6 +58,7 @@ export function usersMarkup(data, search = '', { offset = 0, status = 'all' } = 
       <div class="user-link"><label class="lbl" for="student-${esc(user.id)}">Студент из «Посещаемости»</label><select id="student-${esc(user.id)}" data-student><option value="">Выберите студента</option>${active.map(s => `<option value="${esc(s.course + ':' + s.id)}" ${linked === s.course + ':' + s.id ? 'selected' : ''}>${esc(s.displayName)} · ${esc(s.groupName || 'Без группы')} · ${esc(s.course)} курс</option>`).join('')}</select>
       ${active.length ? '' : '<p class="college">В списке нет активных студентов. Проверьте «Посещаемость» и обновите список.</p>'}
       <div class="user-actions"><button class="btn" data-link ${active.length ? '' : 'disabled'}>Подтвердить привязку</button>${linked ? '<button class="btn outline" data-unlink>Снять привязку</button>' : ''}</div>
+      <button type="button" class="small-btn delete-link" data-delete-user>Удалить аккаунт</button>
       <div class="user-confirm" data-row-confirm hidden></div><p class="college user-row-status" data-row-status role="status"></p></div></div></details>`;
   }).join('');
   return `<div class="users-list-head"><span>${search || status !== 'all' ? 'Найдено' : 'Всего аккаунтов'}: <strong>${data.total}</strong></span><span class="college">Нажмите на аккаунт, чтобы открыть</span></div>

@@ -14,6 +14,7 @@ import {
   ROLES, COURSES, isIso, isMonday, defaultConfig, studentOp, courseOp, emptyWeek, applyMarks, prepareImport,
 } from './att-logic.js?v=__V__';
 import { createUsersClient } from './users-client.js?v=__V__';
+import { fetchJsonWithTimeout } from './network.js?v=__V__';
 
 export const OWNER = 'WTFHOSHI';
 export const DATA_REPO = 'tkpst-admin-data';
@@ -97,6 +98,7 @@ let S = null;        // {role, gh, dk, exp?}
 let dataKey = null;
 const usersClient = createUsersClient();
 let loginVersion = 0;
+let cloudConnection = null;
 const ls = (k, v, where = localStorage) => {
   try {
     if (v === undefined) return where.getItem(k);
@@ -119,13 +121,15 @@ function session() {
 
 export const loggedIn = () => !!session();
 export const currentRole = () => (session() ? S.role : '');
-export const panelReady = () => !!session() && (S.role !== 'admin' || !!S.cloud?.token && S.cloud.expiresAt > Date.now());
+export const panelReady = () => !!session();
 
 export async function usersApi(path, body, signal) {
   const s = session();
   if (!s) { logout(); throw fail('Вход истёк. Войдите в админ-панель заново.', 401); }
   if (s.role !== 'admin') throw fail('Аккаунты доступны только администратору.', 403);
-  if (!s.cloud || s.cloud.expiresAt <= Date.now()) { logout(); throw fail('Вход истёк. Войдите в админ-панель заново.', 401); }
+  if ((!s.cloud || s.cloud.expiresAt <= Date.now()) && cloudConnection?.owner === s) await cloudConnection.promise;
+  if (session() !== s) throw fail('Вход отменён. Войдите заново.', 401);
+  if (!s.cloud || s.cloud.expiresAt <= Date.now()) throw fail('Сервис личных кабинетов недоступен по этой сети. Расписание и посещаемость доступны в соседних вкладках.', 503, 'cloud_unavailable');
   usersClient.restore(s.cloud);
   try { return await usersClient.request(path, body, signal); }
   catch (error) { if (error.status === 401 && session() === s) logout(); throw error; }
@@ -142,6 +146,7 @@ export async function syncUsers(signal) {
 
 export function logout() {
   loginVersion++;
+  cloudConnection?.controller.abort(); cloudConnection = null;
   const saved = session();
   if (saved?.cloud) usersClient.restore(saved.cloud);
   usersClient.logout().catch(() => {});
@@ -160,28 +165,26 @@ export function startSession(secret, remember, cloud = null) {
 }
 
 export async function loadVault() {
-  let r;
-  try { r = await fetch('vault.json', { cache: 'no-store' }); } catch { throw fail('Нет интернета', 0); }
+  let r, data;
+  try { ({ response: r, data } = await fetchJsonWithTimeout(fetch, 'vault.json', { cache: 'no-store' })); } catch { throw fail('Не удалось загрузить сейф админки. Проверьте подключение и повторите вход.', 0); }
   if (r.status === 404) return null;
   if (!r.ok) throw fail('Не удалось загрузить панель: ' + r.status, 502);
-  return r.json();
+  return data;
 }
 
 // ---------------- GitHub ----------------
 
 async function gh(path, init = {}) {
-  let r;
+  let r, body;
   try {
-    r = await fetch(GH + path, {
+    ({ response: r, data: body } = await fetchJsonWithTimeout(fetch, GH + path, {
       cache: 'no-store', ...init,
       headers: {
         Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + S.gh, 'X-GitHub-Api-Version': '2022-11-28',
         ...(init.body ? { 'Content-Type': 'application/json' } : {}),
       },
-    });
+    }));
   } catch { throw fail('Нет связи с GitHub', 0); }
-  let body = null;
-  try { body = await r.json(); } catch { /* пусто */ }
   if (r.status === 401) throw fail('GitHub не принял ключ — возможно, у ключа истёк срок. Администратору: открой «Настройку» и обнови ключ.', 502, 'gh_key');
   if (r.status === 403 && body && /rate limit/i.test(body.message || '')) throw fail('GitHub временно ограничил запросы — подожди пару минут', 503);
   return { status: r.status, ok: r.ok, body };
@@ -293,14 +296,20 @@ export async function api(path, body) {
     if (!vault) throw fail('Панель ещё не настроена. Администратору: открой «Настройку» (ссылка внизу).', 503, 'no_vault');
     const secret = await openVault(vault, String((body && body.password) || ''));
     if (!secret) { await sleep(500); throw fail('Неверный пароль', 401); }
-    let cloud = null;
-    if (secret.role === 'admin') {
-      const exchange = createUsersClient();
-      await exchange.login(String(body.password)); cloud = exchange.credentials();
-      if (version !== loginVersion) { exchange.logout().catch(() => {}); throw fail('Вход отменён. Повторите попытку.', 401); }
-    }
     if (version !== loginVersion) throw fail('Вход отменён. Повторите попытку.', 401);
-    startSession(secret, !!(body && body.remember), cloud);
+    startSession(secret, !!(body && body.remember));
+    if (secret.role === 'admin') {
+      const storage = body.remember ? localStorage : sessionStorage;
+      const storedSession = ls(SESSION_KEY, undefined, storage);
+      const owner = session(), controller = new AbortController(), exchange = createUsersClient();
+      const connection = { owner, controller, promise: null };
+      cloudConnection = connection;
+      connection.promise = exchange.login(String(body.password), controller.signal).then(() => {
+        if (session() !== owner || ls(SESSION_KEY, undefined, storage) !== storedSession) { exchange.logout().catch(() => {}); return; }
+        owner.cloud = exchange.credentials();
+        if (owner.cloud) { owner.exp = Math.min(owner.exp, owner.cloud.expiresAt); ls(SESSION_KEY, JSON.stringify(owner), storage); }
+      }).catch(() => {});
+    }
     return { token: 'ok', role: secret.role, title: ROLES[secret.role].title };
   }
 
@@ -314,6 +323,7 @@ export async function api(path, body) {
   if (route === 'config' && !body) return loadConfig();
 
   if (route === 'students' && body) {
+    if (body.action === 'delete' && S.role !== 'admin') throw fail('Удаление навсегда доступно только администратору.', 403);
     if (!role.students) throw fail('Нет права менять список студентов', 403);
     return updateData(CONFIG, (c) => { const config = withDefaults(c); const r = studentOp(config, body); return { ...r, value: config }; }, `${by}: список студентов`);
   }

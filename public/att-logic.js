@@ -52,6 +52,13 @@ export function studentOp(config, body) {
   }
   const s = c.students.find((x) => x.id === body.id);
   if (!s) return { ok: false, error: 'Студент не найден' };
+  if (s.deleted) return { ok: false, error: 'Студент удалён навсегда. Восстановление и изменение недоступны.' };
+  if (action === 'delete') {
+    if (body.confirmName !== s.name) return { ok: false, error: 'Для удаления введите точное ФИО студента.' };
+    const to = isIso(body.to) ? body.to : new Date().toISOString().slice(0, 10);
+    c.students[c.students.indexOf(s)] = { id: s.id, name: 'Удалённый студент', ...(s.from ? { from: s.from } : {}), to: s.to && s.to < to ? s.to : to, deleted: true };
+    return { ok: true };
+  }
   if (action === 'remove') {
     // Не удаляем: отмечаем, с какого дня студента нет в списке. Прошлые отметки остаются.
     s.to = isIso(body.to) ? body.to : addDays(new Date().toISOString().slice(0, 10), -1);
@@ -129,7 +136,7 @@ export function prepareImport(config, course, data) {
   const c = config.courses[String(course)];
   if (!c) return { ok: false, error: 'Нет такого курса' };
   if (!data || typeof data.weeks !== 'object') return { ok: false, error: 'Пустой импорт' };
-  const byKey = new Map(c.students.map((s) => [nameKey(s.name), s]));
+  const byKey = new Map(c.students.filter(s => !s.deleted).map((s) => [nameKey(s.name), s]));
   const firstSeen = new Map();
   for (const monday of Object.keys(data.weeks).sort()) {
     for (const name of Object.keys(data.weeks[monday])) if (!firstSeen.has(nameKey(name))) firstSeen.set(nameKey(name), [name, monday]);

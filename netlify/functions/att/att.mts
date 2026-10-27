@@ -102,6 +102,7 @@ export default async (req: Request, context: any) => {
   if (route === 'config' && req.method === 'GET') return json(req, await loadConfig(s));
 
   if (route === 'students' && req.method === 'POST') {
+    if (body.action === 'delete' && auth.role !== 'admin') return fail(req, 'Удаление навсегда доступно только администратору', 403);
     if (!role.students) return fail(req, 'Нет права менять список студентов', 403);
     const config = await loadConfig(s);
     const r = studentOp(config, body);
