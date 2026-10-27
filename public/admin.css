@@ -47,39 +47,98 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .admin-tabs a.on { background: var(--primary); color: var(--on-primary); }
 .admin-tabs + #app .bar { padding-top: 6px; }
 
-/* Личные кабинеты: список аккаунтов и подтверждение принадлежности студенту. */
-.users-main { max-width: 1080px; gap: 20px; }
-.users-main h1, .users-login h1 { margin: 8px 0 0; font-size: 26px; line-height: 1.2; }
-.users-login { max-width: 520px; padding-top: 32px; line-height: 1.5; }
-.users-login form { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
-.users-login form p { margin: 0 0 8px; }
-.users-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.users-heading .btn { flex: none; }
-.users-heading p { margin: 12px 0 0; max-width: 65ch; line-height: 1.5; }
-.users-search { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
-.users-search > div { display: flex; gap: 10px; }
-.users-search input { min-width: 0; }
-.users-tools, .user-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.users-summary { padding: 0 0 16px; color: var(--muted); font-size: 15px; }
-.users-summary strong { color: var(--text); font-variant-numeric: tabular-nums; }
-.user-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 1.65fr); gap: 24px; padding: 24px 0; border-top: 1px solid var(--outline); }
-.user-row h2 { color: var(--text); margin: 0 0 6px; font-size: 18px; overflow-wrap: anywhere; }
-.user-identity p { margin: 6px 0; overflow-wrap: anywhere; }
-.user-link-status { margin: 0 0 12px; line-height: 1.5; font-size: 14px; }
-.user-link select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
-.user-actions { margin-top: 12px; }
-.user-row [data-row-status] { margin: 8px 0 0; line-height: 1.5; }
-.users-empty { padding: 36px 0; border-top: 1px solid var(--outline); }
-.users-empty h2 { margin: 0 0 12px; color: var(--text); }
-.users-main .btn, .users-login .btn { min-height: 44px; }
-.users-main button:disabled, .users-login button:disabled { opacity: .55; cursor: wait; }
-.users-main button:focus-visible, .users-main select:focus-visible, .users-login input:focus-visible, .users-login button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
-.users-main button:hover:not(:disabled), .users-login button:hover:not(:disabled) { filter: brightness(.94); }
+/* Общий вход и аккаунты: те же поверхности и контролы, что в остальных разделах. */
+.panel-login { max-width: 520px; padding-top: 28px; gap: 20px; }
+.panel-login h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+.panel-login-intro { margin: 12px 0 24px; line-height: 1.55; }
+.panel-password { position: relative; }
+.panel-password input { padding-right: 54px !important; min-height: 48px; }
+.panel-password .icon { position: absolute; right: 3px; top: 2px; width: 44px; height: 44px; color: var(--muted); }
+.panel-remember { display: flex; gap: 10px; align-items: flex-start; margin: 18px 0; font-size: 14px; line-height: 1.4; }
+.panel-remember input { margin: 0; width: 20px; height: 20px; flex: none; accent-color: var(--primary); }
+.panel-submit { width: 100%; min-height: 48px; margin-top: 8px; }
+.panel-login-foot { margin: 20px 0 0; line-height: 1.5; }
+.panel-access-note { padding: 0 4px; font-size: 13px; line-height: 1.55; }
+.panel-access-note p { margin: 0 0 12px; }
+.panel-access-note a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.users-main { max-width: 1240px; gap: 16px; }
+.users-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.users-heading h1 { margin: 0; font-size: 20px; line-height: 1.3; }
+.users-heading p { margin: 6px 0 0; line-height: 1.5; }
+.users-toolbar .small-btn, .users-source .small-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; flex: none; }
+.users-toolbar .small-btn svg, .users-source svg { width: 18px; height: 18px; }
+.users-search { margin: 0 0 16px; }
+.users-search-line { display: flex; gap: 8px; align-items: center; position: relative; }
+.users-search-line > span { position: absolute; left: 12px; color: var(--muted); pointer-events: none; }
+.users-search-line input { padding-left: 42px !important; min-width: 0; min-height: 46px; flex: 1; }
+.users-search-line .btn { flex: none; min-height: 46px; }
+.users-filter { display: flex; width: min(100%, 460px); }
+.users-filter button { min-width: 0; flex: 1; min-height: 44px; padding: 9px 12px; font-size: 14px; }
+.users-list { padding: 0 !important; overflow: hidden; }
+.users-list-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 20px; font-size: 14px; }
+.users-list-head strong, .user-date, .users-pagination { font-variant-numeric: tabular-nums; }
+.users-column-head, .user-summary { display: grid; grid-template-columns: minmax(0, 1fr) 132px 140px 20px; gap: 20px; align-items: center; }
+.users-column-head { padding: 10px 20px; background: var(--card-high); color: var(--muted); font-size: 12px; }
+.user-row { border-top: 1px solid var(--outline); }
+.user-summary { list-style: none; cursor: pointer; padding: 16px 20px; min-height: 76px; }
+.user-summary::-webkit-details-marker { display: none; }
+.user-summary:hover { background: var(--card-high); }
+.user-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.user-avatar { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; font-weight: 600; font-size: 14px; color: var(--on-secondary-c); background: var(--secondary-c); }
+.user-name { display: flex; flex-direction: column; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.user-name strong { font-size: 15px; font-weight: 600; }
+.user-name > span, .user-date { color: var(--muted); font-size: 13px; }
+.user-badge { justify-self: start; font-size: 12px; border-radius: 6px; padding: 5px 8px; color: var(--muted); background: var(--card-high); white-space: nowrap; }
+.user-badge.verified { color: var(--on-primary-c); background: var(--primary-c); }
+.user-chevron { color: var(--muted); transition: transform .15s ease-out; }
+.user-row[open] .user-chevron { transform: rotate(180deg); }
+.user-row[open] .user-summary { background: var(--card-high); }
+.user-detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 28px; padding: 24px 20px; }
+.user-record h2 { color: var(--text); font-size: 15px; margin: 0 0 10px; }
+.user-record p { margin: 0 0 12px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.user-record p.college { font-size: 13px; color: var(--muted); }
+.user-link select { width: 100%; min-width: 0; min-height: 46px; padding: 10px 12px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); color: var(--text); font: inherit; font-size: 16px; }
+.user-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.user-actions .btn { min-height: 44px; font-size: 14px; padding: 10px 14px; }
+.user-confirm { margin-top: 16px; padding: 14px; border: 1px solid var(--outline); border-radius: 12px; background: var(--bg); }
+.user-confirm[hidden] { display: none; }
+.user-confirm p { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.user-row-status { margin: 10px 0 0; line-height: 1.5; }
+.user-row-status:empty { display: none; }
+.users-pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--outline); }
+.users-pagination > div { display: flex; gap: 8px; }
+.users-pagination button { min-height: 44px; padding: 8px 12px; }
+.users-source { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 4px 4px 0; }
+.users-source strong { font-size: 13px; font-weight: 600; }
+.users-source p { margin: 5px 0 0; }
+.users-empty { padding: 32px 20px; line-height: 1.5; }
+.users-empty h1, .users-empty h2 { margin: 0 0 10px; color: var(--text); font-size: 18px; }
+.users-empty p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+.users-loading { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 220px; color: var(--muted); font-size: 14px; }
+.users-loading-mark { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--outline); border-top-color: var(--primary); animation: users-loading .9s linear infinite; }
+@keyframes users-loading { to { transform: rotate(360deg); } }
+.users-main button:disabled, .panel-login button:disabled { opacity: .5; cursor: default; }
+.users-main :is(button,select,summary):focus-visible, .panel-login :is(button,input):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.users-main button:hover:not(:disabled), .panel-login button:hover:not(:disabled) { filter: brightness(.95); }
+@media (prefers-reduced-motion: reduce) { .users-loading-mark { animation: none; } .user-chevron { transition: none; } }
 @media (max-width: 620px) {
-  .user-row { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .users-heading { gap: 12px; }
-  .users-main h1 { font-size: 23px; }
+  .panel-login { padding-top: 16px; }
   .admin-tabs a { min-width: 0; font-size: 13px; padding: 12px 4px; }
+  .users-filter { width: 100%; }
+  .users-filter button { font-size: 12px; padding: 9px 4px; }
+  .users-refresh span { display: none; }
+  .users-column-head { display: none; }
+  .users-list-head { padding: 14px 16px; }
+  .users-list-head .college { display: none; }
+  .user-summary { grid-template-columns: minmax(0, 1fr) auto 20px; gap: 12px; padding: 16px; }
+  .user-person { grid-column: 1 / 3; gap: 10px; }
+  .user-chevron { grid-column: 3; grid-row: 1; }
+  .user-badge { grid-row: 2; grid-column: 1; margin-left: 50px; }
+  .user-date { grid-row: 2; grid-column: 2 / 4; font-size: 12px; justify-self: end; }
+  .user-detail { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 20px 16px; }
+  .users-pagination { padding: 10px 16px; }
+  .users-source { align-items: flex-start; gap: 12px; }
+  .users-source .small-btn { padding: 0; min-width: 44px; font-size: 12px; }
 }
 
 /* ---------- Посещаемость ---------- */

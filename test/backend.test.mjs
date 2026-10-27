@@ -10,9 +10,16 @@ globalThis.sessionStorage = mem();
 const files = new Map();     // 'repo/path' → {text, sha}
 let shaN = 0;
 let vaultText = null;
+let cloudLogins = 0;
+const cloudToken = 'a'.repeat(43);
 const commits = [];
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, headers: new Map() });
 globalThis.fetch = async (url, init = {}) => {
+  if (String(url).startsWith('https://tkpst-schedule.vercel.app/api/admin/')) {
+    if (url.endsWith('/login')) { cloudLogins++; return reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }); }
+    assert.equal(init.headers.Authorization, 'Bearer ' + cloudToken);
+    return reply(200, { ok: true });
+  }
   if (url === 'vault.json') return vaultText ? reply(200, JSON.parse(vaultText)) : reply(404, null);
   const u = new URL(url);
   assert.equal(init.headers.Authorization, 'Bearer gh-test-key');
@@ -64,6 +71,35 @@ test('вход, запоминание на 1 день, выход', async () =>
   await B.api('login', { password: passwords.admin, remember: false });
   assert.ok(sessionStorage.getItem('admin_session'));
   assert.equal(localStorage.getItem('admin_session'), null);
+});
+
+test('общий вход: admin server session is persisted with vault role and reused without password', async () => {
+  B.logout(); const before = cloudLogins;
+  await B.api('login', { password: passwords.admin, remember: true });
+  assert.equal(cloudLogins, before + 1);
+  const saved = JSON.parse(localStorage.getItem('admin_session'));
+  assert.equal(saved.cloud.token, cloudToken);
+  assert.ok(!JSON.stringify(saved).includes(passwords.admin));
+  await B.usersApi('users'); assert.equal(cloudLogins, before + 1);
+  const reloaded = await import('../public/backend.js?shared-session-reload');
+  assert.equal(reloaded.panelReady(), true);
+  await reloaded.usersApi('users'); assert.equal(cloudLogins, before + 1, 'reload reuses saved bearer');
+  B.logout(); assert.equal(localStorage.getItem('admin_session'), null);
+  await assert.rejects(B.usersApi('users'), e => e.status === 401);
+  await B.api('login', { password: passwords.kurator });
+  assert.equal(cloudLogins, before + 1, 'curator uses existing vault only');
+  await assert.rejects(B.usersApi('users'), e => e.status === 403);
+  await B.api('login', { password: passwords.admin });
+});
+test('общий вход: expiry returns active Users to the shared login instead of a retry loop', async () => {
+  await B.api('login', { password: passwords.admin, remember: true });
+  const saved = JSON.parse(localStorage.getItem('admin_session'));
+  const realNow = Date.now, realDispatch = globalThis.dispatchEvent; let loggedOut = 0;
+  Date.now = () => saved.exp + 1;
+  globalThis.dispatchEvent = event => { if (event.type === 'admin-logout') loggedOut++; };
+  try { await assert.rejects(B.usersApi('users'), error => error.status === 401); assert.ok(loggedOut > 0); }
+  finally { Date.now = realNow; globalThis.dispatchEvent = realDispatch; }
+  await B.api('login', { password: passwords.admin });
 });
 
 test('студенты и отметки зашифрованы в приватном репозитории', async () => {

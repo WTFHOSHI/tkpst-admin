@@ -13,6 +13,7 @@
 import {
   ROLES, COURSES, isIso, isMonday, defaultConfig, studentOp, courseOp, emptyWeek, applyMarks, prepareImport,
 } from './att-logic.js?v=__V__';
+import { createUsersClient } from './users-client.js?v=__V__';
 
 export const OWNER = 'WTFHOSHI';
 export const DATA_REPO = 'tkpst-admin-data';
@@ -94,6 +95,8 @@ function fail(message, status = 400, code) {
 
 let S = null;        // {role, gh, dk, exp?}
 let dataKey = null;
+const usersClient = createUsersClient();
+let loginVersion = 0;
 const ls = (k, v, where = localStorage) => {
   try {
     if (v === undefined) return where.getItem(k);
@@ -116,8 +119,32 @@ function session() {
 
 export const loggedIn = () => !!session();
 export const currentRole = () => (session() ? S.role : '');
+export const panelReady = () => !!session() && (S.role !== 'admin' || !!S.cloud?.token && S.cloud.expiresAt > Date.now());
+
+export async function usersApi(path, body, signal) {
+  const s = session();
+  if (!s) { logout(); throw fail('Вход истёк. Войдите в админ-панель заново.', 401); }
+  if (s.role !== 'admin') throw fail('Аккаунты доступны только администратору.', 403);
+  if (!s.cloud || s.cloud.expiresAt <= Date.now()) { logout(); throw fail('Вход истёк. Войдите в админ-панель заново.', 401); }
+  usersClient.restore(s.cloud);
+  try { return await usersClient.request(path, body, signal); }
+  catch (error) { if (error.status === 401 && session() === s) logout(); throw error; }
+}
+
+export async function syncUsers(signal) {
+  if (currentRole() !== 'admin') throw fail('Нет доступа к аккаунтам.', 403);
+  const owner = session();
+  const { ticket } = await usersApi('sync/start', {}, signal);
+  const config = await api('config');
+  if (session() !== owner || signal?.aborted) throw fail('Обновление отменено. Повторите загрузку.', 409);
+  return usersApi('sync', { config, ticket }, signal);
+}
 
 export function logout() {
+  loginVersion++;
+  const saved = session();
+  if (saved?.cloud) usersClient.restore(saved.cloud);
+  usersClient.logout().catch(() => {});
   globalThis.dispatchEvent?.(new Event('admin-logout'));
   S = null; dataKey = null;
   ls(SESSION_KEY, null, localStorage);
@@ -125,10 +152,10 @@ export function logout() {
 }
 
 /** Начать сессию. remember — запомнить на устройстве на 1 день, иначе — до закрытия вкладки. */
-export function startSession(secret, remember) {
+export function startSession(secret, remember, cloud = null) {
   logout();
-  S = { role: secret.role, gh: secret.gh, dk: secret.dk };
-  if (remember) { S.exp = Date.now() + REMEMBER_MS; ls(SESSION_KEY, JSON.stringify(S), localStorage); }
+  S = { role: secret.role, gh: secret.gh, dk: secret.dk, ...(cloud ? { cloud } : {}), exp: Math.min(Date.now() + REMEMBER_MS, cloud?.expiresAt || Infinity) };
+  if (remember) ls(SESSION_KEY, JSON.stringify(S), localStorage);
   else ls(SESSION_KEY, JSON.stringify(S), sessionStorage);
 }
 
@@ -261,11 +288,19 @@ export async function api(path, body) {
   const q = new URLSearchParams(qs || '');
 
   if (route === 'login') {
+    const version = ++loginVersion;
     const vault = await loadVault();
     if (!vault) throw fail('Панель ещё не настроена. Администратору: открой «Настройку» (ссылка внизу).', 503, 'no_vault');
     const secret = await openVault(vault, String((body && body.password) || ''));
     if (!secret) { await sleep(500); throw fail('Неверный пароль', 401); }
-    startSession(secret, !!(body && body.remember));
+    let cloud = null;
+    if (secret.role === 'admin') {
+      const exchange = createUsersClient();
+      await exchange.login(String(body.password)); cloud = exchange.credentials();
+      if (version !== loginVersion) { exchange.logout().catch(() => {}); throw fail('Вход отменён. Повторите попытку.', 401); }
+    }
+    if (version !== loginVersion) throw fail('Вход отменён. Повторите попытку.', 401);
+    startSession(secret, !!(body && body.remember), cloud);
     return { token: 'ok', role: secret.role, title: ROLES[secret.role].title };
   }
 

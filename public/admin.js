@@ -1,3 +1,4 @@
+import { showPanelLogin } from './login-view.js?v=__V__';
 // Админ-панель → «Изменение расписания». Сохранение — прямо в web/overrides.json репозитория tkpst-schedule
 // (ключ GitHub лежит в зашифрованном сейфе, см. backend.js). Вход — по тем же паролям, что и «Посещаемость».
 // Сайт и приложения (Android/iOS) скачивают overrides.json сами — обновлять их не нужно.
@@ -132,34 +133,7 @@ function pairDraft(n) {
 // ---------------- Вход ----------------
 
 function login(error = '') {
-  $app.innerHTML = `
-    <header class="bar"><span class="icon-space"></span>
-      <div class="bar-title"><div class="t">Админ-панель</div><div class="s">ИС-25-3С · изменения расписания</div></div>
-      <span class="icon-space"></span></header>
-    <main class="admin">
-      <div class="card">
-        <b>Вход по паролю</b>
-        <p class="college">Тот же пароль, что и в «Посещаемости»: администратор, староста или куратор.</p>
-        <label class="lbl" for="pw">Пароль</label>
-        <input id="pw" type="password" autocomplete="current-password" placeholder="Пароль">
-        <label class="college" style="display:flex;gap:8px;align-items:center;margin-top:10px"><input type="checkbox" id="remember"> Запомнить на этом устройстве (1 день)</label>
-        ${error ? `<p class="warn" style="margin-top:10px">${esc(error)}</p>` : ''}
-        <button class="btn" data-login style="margin-top:12px;width:100%">Войти</button>
-        <p class="college" style="margin-top:12px">На чужом устройстве галочку не ставь. <a href="setup.html">Настройка</a> — для администратора.</p>
-      </div>
-    </main>`;
-  const input = $app.querySelector('#pw');
-  const go = async () => {
-    const pw = input.value.trim();
-    if (!pw) return;
-    const btn = $app.querySelector('[data-login]');
-    btn.disabled = true; btn.textContent = 'Проверяю…';
-    try { await api('login', { password: pw, remember: $app.querySelector('#remember').checked }); boot(); }
-    catch (e) { login(e.status === 401 ? 'Неверный пароль' : e.message); }
-  };
-  $app.querySelector('[data-login]').onclick = go;
-  input.onkeydown = (e) => { if (e.key === 'Enter') go(); };
-  input.focus();
+  showPanelLogin($app, boot, error);
 }
 
 async function boot() {
