@@ -15,8 +15,21 @@ let cloudBlocked = false;
 let deferCloud = false, releaseCloud;
 const cloudToken = 'a'.repeat(43);
 const commits = [];
+const attendanceToken = 'w'.repeat(43), attendanceCalls = [], attendanceOrder = [];
+let attendanceFail = false, attendanceStartHook = null;
+let attendanceTicket = 0;
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, headers: new Map() });
 globalThis.fetch = async (url, init = {}) => {
+  if (String(url).startsWith('https://tkpst-api.onrender.com/api/admin/attendance/')) {
+    if (cloudBlocked) return new Promise(() => {});
+    const path = String(url).split('/').at(-1), body = JSON.parse(init.body || '{}');
+    attendanceCalls.push({ path, body, auth: init.headers.Authorization }); attendanceOrder.push(path);
+    if (path === 'login') return reply(200, { token: attendanceToken, expiresAt: Date.now() + 864e5 });
+    assert.ok(['Bearer ' + attendanceToken, 'Bearer ' + cloudToken].includes(init.headers.Authorization));
+    if (path === 'start') { if (attendanceStartHook) await attendanceStartHook(); return reply(200, { ticket: String(++attendanceTicket).padStart(43, 't') }); }
+    if (path === 'sync' && attendanceFail) return reply(503, { error: 'Synthetic sync failure' });
+    return reply(200, { ok: true, syncedAt: Date.now() });
+  }
   if (String(url).startsWith('https://tkpst-api.onrender.com/api/admin/')) {
     if (cloudBlocked) return new Promise(() => {});
     if (deferCloud && url.endsWith('/login')) return new Promise(resolve => { releaseCloud = resolve; });
@@ -41,6 +54,7 @@ globalThis.fetch = async (url, init = {}) => {
     commits.push({ repo, path, message: b.message });
     return reply(200, { content: { sha } });
   }
+  if (path.startsWith('w/')) attendanceOrder.push('read:' + path);
   const f = files.get(key);
   if (f) return reply(200, { content: Buffer.from(f.text).toString('base64').replace(/(.{60})/g, '$1\n'), sha: f.sha });
   const dir = [...files.keys()].filter((k) => k.startsWith(key + '/')).map((k) => ({ name: k.slice(key.length + 1) }));
@@ -210,4 +224,58 @@ test('student permanent deletion is admin-only, confirmed and cannot be restored
   assert.equal(tombstone.to, '2026-10-26');
   assert.ok(!JSON.stringify(next).includes(student.name));
   await assert.rejects(B.api('students', { course: '2', action: 'restore', id: student.id }));
+});
+
+
+test('attendance writers: every vault role sends a scoped minimal authoritative snapshot after reserving ticket', async () => {
+  for (const role of ['admin', 'starosta', 'kurator']) {
+    await B.api('login', { password: passwords[role] });
+    attendanceOrder.length = 0;
+    await B.syncAttendanceWeek('2', '2026-10-05', { force: true, knownWeek: { m: { stale: {} } } });
+    assert.ok(attendanceOrder.indexOf('start') < attendanceOrder.indexOf('read:w/2/2026-10-05.json'));
+    const call = attendanceCalls.filter(c => c.path === 'sync').at(-1);
+    assert.equal(call.auth, 'Bearer ' + attendanceToken);
+    assert.deepEqual(Object.keys(call.body).sort(), ['course', 'monday', 'ticket', 'week']);
+    assert.ok(!call.body.week.m.stale);
+    const wire = JSON.stringify(call.body);
+    for (const secret of ['gh-test-key', ...Object.values(passwords), JSON.parse(sessionStorage.getItem('admin_session')).dk]) assert.ok(!wire.includes(secret));
+  }
+});
+
+test('attendance sync failure preserves successful authoritative marks and can retry without saving again', async () => {
+  attendanceFail = true;
+  try {
+    const saved = await B.api('marks', { course: '1', w: '2026-10-19', changes: [{ s: 'synthetic', d: '2026-10-20', p: 1, v: 'P' }] });
+    assert.equal(saved.m.synthetic['2026-10-20'][1], 'P');
+    await assert.rejects(B.syncAttendanceWeek('1', '2026-10-19', { force: true }), /Synthetic sync failure/);
+  } finally { attendanceFail = false; }
+  const writes = commits.length;
+  await B.syncAttendanceWeek('1', '2026-10-19', { force: true });
+  assert.equal(commits.length, writes);
+  assert.equal(attendanceCalls.filter(c => c.path === 'sync').at(-1).body.week.m.synthetic['2026-10-20'][1], 'P');
+});
+
+test('attendance logout discards in-flight ticket before publishing', async () => {
+  let entered, release;
+  const started = new Promise(resolve => { entered = resolve; });
+  attendanceStartHook = async () => { entered(); await new Promise(resolve => { release = resolve; }); };
+  const before = attendanceCalls.filter(c => c.path === 'sync').length;
+  const pending = B.syncAttendanceWeek('2', '2026-10-05', { force: true });
+  await started; B.logout(); release();
+  await assert.rejects(pending, error => error.status === 409);
+  attendanceStartHook = null;
+  assert.equal(attendanceCalls.filter(c => c.path === 'sync').length, before);
+  await B.api('login', { password: passwords.admin });
+});
+
+test('attendance history includes empty clearing snapshots and is reset after logout', async () => {
+  await B.writeData('w/3/2026-10-12.json', { m: {}, pairs: {}, hide: {}, at: '', by: '' });
+  const result = await B.syncAttendanceHistory('3', { force: true });
+  assert.equal(result.failed, 0); assert.equal(result.done, result.total); assert.ok(result.total >= 2);
+  const cleared = attendanceCalls.filter(c => c.path === 'sync' && c.body.monday === '2026-10-12').at(-1);
+  assert.deepEqual(cleared.body.week.m, {});
+  const before = attendanceCalls.filter(c => c.path === 'sync').length;
+  await B.syncAttendanceHistory('3'); assert.equal(attendanceCalls.filter(c => c.path === 'sync').length, before);
+  B.logout(); await B.api('login', { password: passwords.starosta });
+  await B.syncAttendanceHistory('3'); assert.ok(attendanceCalls.filter(c => c.path === 'sync').length > before);
 });

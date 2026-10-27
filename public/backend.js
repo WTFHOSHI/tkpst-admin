@@ -14,6 +14,7 @@ import {
   ROLES, COURSES, isIso, isMonday, defaultConfig, studentOp, courseOp, emptyWeek, applyMarks, prepareImport,
 } from './att-logic.js?v=__V__';
 import { createUsersClient } from './users-client.js?v=__V__';
+import { createAttendanceClient } from './attendance-client.js?v=__V__';
 import { fetchJsonWithTimeout } from './network.js?v=__V__';
 
 export const OWNER = 'WTFHOSHI';
@@ -99,6 +100,14 @@ let dataKey = null;
 const usersClient = createUsersClient();
 let loginVersion = 0;
 let cloudConnection = null;
+let attendanceConnection = null;
+const attendanceClient = createAttendanceClient();
+const attendanceQueues = new Map(), attendanceVersions = new Map(), attendanceHistory = new Map();
+function notifyAttendance(detail) { globalThis.dispatchEvent?.(new CustomEvent('attendance-sync', { detail })); }
+function sameStoredSession(owner, storage) {
+  try { return session() === owner && JSON.parse(ls(SESSION_KEY, undefined, storage) || 'null')?.sessionId === owner.sessionId; }
+  catch { return false; }
+}
 const ls = (k, v, where = localStorage) => {
   try {
     if (v === undefined) return where.getItem(k);
@@ -144,12 +153,78 @@ export async function syncUsers(signal) {
   return usersApi('sync', { config, ticket }, signal);
 }
 
+async function attendanceApi(path, body, owner, signal) {
+  if (!owner || session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+  if (attendanceConnection?.owner === owner) await attendanceConnection.promise;
+  if (!owner.attendance && owner.role === 'admin' && cloudConnection?.owner === owner) await cloudConnection.promise;
+  if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+  const auth = owner.attendance?.expiresAt > Date.now() ? owner.attendance : owner.role === 'admin' && owner.cloud?.expiresAt > Date.now() ? owner.cloud : null;
+  if (!auth) throw fail('Для обновления ЛК войдите в админку ещё раз. Отметки в админке сохранены.', 503);
+  attendanceClient.restore(auth);
+  return attendanceClient.request(path, body, signal);
+}
+const attendanceVersion = week => JSON.stringify({ m: week.m || {}, pairs: week.pairs || {}, hide: week.hide || {}, at: week.at || '' });
+
+export function syncAttendanceWeek(course, monday, { knownWeek, force = false, signal } = {}) {
+  const owner = session(), key = String(course) + '|' + monday;
+  if (!owner || !COURSES.includes(String(course)) || !isMonday(monday)) return Promise.reject(fail('Неверная неделя посещаемости.', 400));
+  const prior = attendanceQueues.get(key) || Promise.resolve();
+  const task = prior.catch(() => {}).then(async () => {
+    if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+    if (!force && knownWeek && attendanceVersions.get(key) === attendanceVersion(knownWeek)) return { skipped: true };
+    notifyAttendance({ course: String(course), monday, state: 'loading' });
+    const { ticket } = await attendanceApi('start', { course: String(course), monday }, owner, signal);
+    if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+    // Ticket must precede this authoritative read, even if the UI already read a week.
+    const week = (await readData(weekPath(course, monday))).value || emptyWeek();
+    if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+    const result = await attendanceApi('sync', { course: String(course), monday, ticket, week }, owner, signal);
+    if (session() !== owner) throw fail('Обновление отменено.', 409);
+    attendanceVersions.set(key, attendanceVersion(week));
+    notifyAttendance({ course: String(course), monday, state: 'ready', syncedAt: result.syncedAt });
+    return result;
+  }).catch(error => {
+    if (session() === owner && !signal?.aborted) notifyAttendance({ course: String(course), monday, state: 'error', message: error.message });
+    throw error;
+  });
+  attendanceQueues.set(key, task);
+  const clean = () => { if (attendanceQueues.get(key) === task) attendanceQueues.delete(key); };
+  task.then(clean, clean);
+  return task;
+}
+
+export async function syncAttendanceHistory(course, { force = false, signal, onProgress = () => {} } = {}) {
+  const owner = session(); course = String(course);
+  if (!owner || !COURSES.includes(course)) throw fail('Войдите в админку.', 401);
+  if (!force && attendanceHistory.has(course)) return attendanceHistory.get(course);
+  const response = await gh(cpath(DATA_REPO, 'w/' + course) + '?t=' + Date.now());
+  if (response.status !== 404 && !response.ok) throw ghError(response, 'посещаемость для ЛК');
+  const weeks = (Array.isArray(response.body) ? response.body : []).filter(file => file.type === undefined || file.type === 'file').map(file => file.name.replace(/\.json$/, '')).filter(isMonday).sort();
+  if (weeks.length > 520) throw fail('Слишком много недель для одного обновления. Обратитесь к администратору.', 400);
+  let done = 0, failed = 0;
+  onProgress({ done, failed, total: weeks.length });
+  await pool(weeks, 3, async monday => {
+    if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+    try { await syncAttendanceWeek(course, monday, { force, signal }); done++; }
+    catch (error) { if (session() !== owner || signal?.aborted) throw error; failed++; }
+    onProgress({ done, failed, total: weeks.length });
+  });
+  if (session() !== owner || signal?.aborted) throw fail('Обновление отменено.', 409);
+  const result = { done, failed, total: weeks.length };
+  if (!failed) attendanceHistory.set(course, result);
+  return result;
+}
+
 export function logout() {
   loginVersion++;
   cloudConnection?.controller.abort(); cloudConnection = null;
+  attendanceConnection?.controller.abort(); attendanceConnection = null;
   const saved = session();
   if (saved?.cloud) usersClient.restore(saved.cloud);
   usersClient.logout().catch(() => {});
+  if (saved?.attendance) attendanceClient.restore(saved.attendance);
+  attendanceClient.logout().catch(() => {});
+  attendanceVersions.clear(); attendanceHistory.clear(); attendanceQueues.clear();
   globalThis.dispatchEvent?.(new Event('admin-logout'));
   S = null; dataKey = null;
   ls(SESSION_KEY, null, localStorage);
@@ -159,7 +234,7 @@ export function logout() {
 /** Начать сессию. remember — запомнить на устройстве на 1 день, иначе — до закрытия вкладки. */
 export function startSession(secret, remember, cloud = null) {
   logout();
-  S = { role: secret.role, gh: secret.gh, dk: secret.dk, ...(cloud ? { cloud } : {}), exp: Math.min(Date.now() + REMEMBER_MS, cloud?.expiresAt || Infinity) };
+  S = { role: secret.role, gh: secret.gh, dk: secret.dk, sessionId: crypto.randomUUID(), ...(cloud ? { cloud } : {}), exp: Math.min(Date.now() + REMEMBER_MS, cloud?.expiresAt || Infinity) };
   if (remember) ls(SESSION_KEY, JSON.stringify(S), localStorage);
   else ls(SESSION_KEY, JSON.stringify(S), sessionStorage);
 }
@@ -250,6 +325,8 @@ function updateData(p, mutate, message) {
       if (!r.ok) throw fail(r.error);
       try {
         await putFile(DATA_REPO, p, JSON.stringify(await seal(await key(), r.value, 'data:' + p)), cur.sha, message);
+        const week = /^w\/([123])\/(\d{4}-\d{2}-\d{2})\.json$/.exec(p);
+        if (week) syncAttendanceWeek(week[1], week[2], { knownWeek: r.value }).catch(() => {});
         return r.value;
       } catch (e) {
         if (e.code !== 'conflict' || attempt >= 5) throw e.code === 'conflict' ? fail('Не получилось сохранить — данные меняют одновременно. Повтори.', 409) : e;
@@ -298,14 +375,24 @@ export async function api(path, body) {
     if (!secret) { await sleep(500); throw fail('Неверный пароль', 401); }
     if (version !== loginVersion) throw fail('Вход отменён. Повторите попытку.', 401);
     startSession(secret, !!(body && body.remember));
+    {
+      const owner = session(), storage = body.remember ? localStorage : sessionStorage;
+      const controller = new AbortController(), exchange = createAttendanceClient();
+      const connection = { owner, controller, promise: null };
+      attendanceConnection = connection;
+      connection.promise = exchange.login(String(body.password), secret.role, controller.signal).then(() => {
+        if (!sameStoredSession(owner, storage)) { exchange.logout().catch(() => {}); return; }
+        owner.attendance = exchange.credentials();
+        if (owner.attendance) ls(SESSION_KEY, JSON.stringify(owner), storage);
+      }).catch(() => {});
+    }
     if (secret.role === 'admin') {
       const storage = body.remember ? localStorage : sessionStorage;
-      const storedSession = ls(SESSION_KEY, undefined, storage);
       const owner = session(), controller = new AbortController(), exchange = createUsersClient();
       const connection = { owner, controller, promise: null };
       cloudConnection = connection;
       connection.promise = exchange.login(String(body.password), controller.signal).then(() => {
-        if (session() !== owner || ls(SESSION_KEY, undefined, storage) !== storedSession) { exchange.logout().catch(() => {}); return; }
+        if (!sameStoredSession(owner, storage)) { exchange.logout().catch(() => {}); return; }
         owner.cloud = exchange.credentials();
         if (owner.cloud) { owner.exp = Math.min(owner.exp, owner.cloud.expiresAt); ls(SESSION_KEY, JSON.stringify(owner), storage); }
       }).catch(() => {});
@@ -337,7 +424,9 @@ export async function api(path, body) {
     const course = courseOf(q.get('course'));
     const w = q.get('w') || '';
     if (!course || !isMonday(w)) throw fail('Неверная неделя');
-    return (await readData(weekPath(course, w))).value || emptyWeek();
+    const week = (await readData(weekPath(course, w))).value || emptyWeek();
+    syncAttendanceWeek(course, w, { knownWeek: week }).catch(() => {});
+    return week;
   }
 
   if (route === 'marks' && body) {

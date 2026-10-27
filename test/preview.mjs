@@ -14,12 +14,32 @@ const config = { courses: { 1: { groupId: null, groupName: '', students: [] }, 2
 const students = config.courses[2].students.map(s => ({ id: s.id, displayName: s.name, course: '2', groupName: 'ИС-25-3С', active: true }));
 const users = [{ id: 'u1', username: 'test_student', displayName: 'Тестовый Студент', createdAt: Date.now(), student: null }, { id: 'u2', username: 'verified_test', displayName: 'Второй Тестовый Студент', createdAt: Date.now() - 864e5, student: students[1], link: { course: '2', studentId: 's2' } }];
 function encryptedConfig() { const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', dk, iv); c.setAAD(Buffer.from('data:config.json')); return JSON.stringify({ v: 1, iv: iv.toString('base64'), ct: Buffer.concat([c.update(JSON.stringify(config)), c.final(), c.getAuthTag()]).toString('base64') }); }
+const weeks = new Map([['w/2/2026-10-26.json', { m: { s1: { '2026-10-27': { 1: 'P', 2: 'N' } }, s2: { '2026-10-27': { 1: 'B' } } }, pairs: {}, hide: {}, at: new Date().toISOString(), by: 'Тестовый администратор' }]]);
+const weekShas = new Map(); let nextSha = 0, nextTicket = 0;
+const attendanceToken = 'w'.repeat(43), attendanceSnapshots = new Map(), attendanceTickets = new Map();
+function encryptWeek(path, value) { const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', dk, iv); c.setAAD(Buffer.from('data:' + path)); return JSON.stringify({ v: 1, iv: iv.toString('base64'), ct: Buffer.concat([c.update(JSON.stringify(value)), c.final(), c.getAuthTag()]).toString('base64') }); }
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, origin), path = url.pathname;
   const json = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); };
   if (path === '/vault.json') return json(200, vault);
   if (path.startsWith('/sched')) return json(200, []);
   if (path.startsWith('/qa-github/')) {
+    const sourcePath = decodeURIComponent(path.split('/contents/')[1] || '');
+    if (/^w\/[123]$/.test(sourcePath)) return json(200, [...weeks.keys()].filter(k => k.startsWith(sourcePath + '/')).map(k => ({ name: k.split('/').at(-1), type: 'file' })));
+    if (/^w\/[123]\/\d{4}-\d{2}-\d{2}\.json$/.test(sourcePath)) {
+      if (req.method === 'PUT') {
+        const chunks = []; for await (const chunk of req) chunks.push(chunk);
+        const payload = JSON.parse(Buffer.concat(chunks).toString());
+        if (weeks.has(sourcePath) && payload.sha !== (weekShas.get(sourcePath) || 'qa-week')) return json(409, { message: 'conflict' });
+        const encrypted = JSON.parse(Buffer.from(payload.content, 'base64').toString());
+        const { createDecipheriv } = await import('node:crypto');
+        const c = createDecipheriv('aes-256-gcm', dk, Buffer.from(encrypted.iv, 'base64')); c.setAAD(Buffer.from('data:' + sourcePath));
+        const ct = Buffer.from(encrypted.ct, 'base64'); c.setAuthTag(ct.subarray(-16));
+        weeks.set(sourcePath, JSON.parse(Buffer.concat([c.update(ct.subarray(0, -16)), c.final()]).toString()));
+        const sha = 'qa-week-' + (++nextSha); weekShas.set(sourcePath, sha); return json(200, { content: { sha } });
+      }
+      return weeks.has(sourcePath) ? json(200, { content: Buffer.from(encryptWeek(sourcePath, weeks.get(sourcePath))).toString('base64'), sha: weekShas.get(sourcePath) || 'qa-week' }) : json(404, {});
+    }
     if (req.method === 'PUT' && path.endsWith('/config.json')) { const chunks = []; for await (const chunk of req) chunks.push(chunk); const payload = JSON.parse(Buffer.concat(chunks).toString()); const encrypted = JSON.parse(Buffer.from(payload.content, 'base64').toString()); const { createDecipheriv } = await import('node:crypto'); const c = createDecipheriv('aes-256-gcm', dk, Buffer.from(encrypted.iv, 'base64')); c.setAAD(Buffer.from('data:config.json')); const ct = Buffer.from(encrypted.ct, 'base64'); c.setAuthTag(ct.subarray(-16)); Object.assign(config, JSON.parse(Buffer.concat([c.update(ct.subarray(0, -16)), c.final()]).toString())); return json(200, { content: { sha: 'qa-config-updated' } }); }
     if (path.endsWith('/config.json')) return json(200, { content: Buffer.from(encryptedConfig()).toString('base64'), sha: 'qa-config' });
     if (path.endsWith('/overrides.json')) return json(200, { content: Buffer.from('{}').toString('base64'), sha: 'qa-overrides' });
@@ -28,6 +48,14 @@ const server = createServer(async (req, res) => {
   }
   if (path.startsWith('/qa-api/')) {
     const chunks = []; for await (const chunk of req) chunks.push(chunk); const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
+    if (path.startsWith('/qa-api/attendance/')) {
+      if (path.endsWith('/login')) return passwords[body.role] === body.password ? json(200, { token: attendanceToken, expiresAt: Date.now() + 864e5 }) : json(401, { error: 'Неверный тестовый пароль' });
+      if (!['Bearer ' + token, 'Bearer ' + attendanceToken].includes(req.headers.authorization)) return json(401, { error: 'Нужен тестовый вход' });
+      if (path.endsWith('/start')) { const ticket = String(++nextTicket).padStart(43, 't'); attendanceTickets.set(ticket, body.course + '|' + body.monday); return json(200, { ticket }); }
+      if (path.endsWith('/sync')) { const key = body.course + '|' + body.monday; if (attendanceTickets.get(body.ticket) !== key) return json(409, { error: 'Неверный тестовый билет' }); attendanceTickets.delete(body.ticket); attendanceSnapshots.set(key, body.week); return json(200, { ok: true, syncedAt: Date.now() }); }
+      if (path.endsWith('/logout')) return json(200, { ok: true });
+      return json(404, {});
+    }
     if (path.endsWith('/login')) return body.password === passwords.admin ? json(200, { token, expiresAt: Date.now() + 864e5 }) : json(401, { error: 'Неверный тестовый пароль' });
     if (req.headers.authorization !== 'Bearer ' + token) return json(401, { error: 'Нужен тестовый вход' });
     if (path.endsWith('/users')) { const list = users.filter(u => (!body.search || (u.displayName + u.username).toLowerCase().includes(body.search.toLowerCase())) && (!body.status || body.status === 'all' || (body.status === 'linked' ? !!u.student : !u.student))); return json(200, { users: list, students, total: list.length, nextOffset: null, syncedAt: Date.now() }); }
@@ -39,7 +67,7 @@ const server = createServer(async (req, res) => {
   try {
     const file = resolve(root, '.' + (path === '/' ? '/index.html' : path)); if (!file.startsWith(resolve(root) + '\\') && !file.startsWith(resolve(root) + '/')) return json(403, {});
     let data = await readFile(file); const ext = extname(file);
-    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-api.onrender.com/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
+    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-api.onrender.com/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const API = 'https://tkpst-api.onrender.com/api/admin/attendance/';", `const API = '${origin}/qa-api/attendance/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
     if (ext === '.html') data = Buffer.from(data.toString().replace('<body>', '<body><aside style="text-align:center;padding:6px;font-size:12px">Тестовый стенд · демонстрационные данные</aside>'));
     res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' })[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(data);
   } catch { json(404, {}); }
