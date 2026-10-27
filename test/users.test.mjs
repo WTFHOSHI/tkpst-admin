@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createUsersClient, usersMarkup } from '../public/users-client.js';
+import { createUsersClient, usersMarkup, studentRemovalMarkup } from '../public/users-client.js';
 
 test('users: token is sent only to fixed API, never cookies, logout revokes and clears', async () => {
   const calls = [];
@@ -29,6 +29,8 @@ test('users: real empty state, escaped names, explicit linking with roster cours
   const html = usersMarkup({ users: [{ id: 'a', username: 'login', displayName: '<script>', createdAt: 1, student: null }], students: [{ id: 's', course: '2', displayName: 'Студент', groupName: 'ИС', active: true }], total: 1, nextOffset: null });
   assert.ok(!html.includes('<script>')); assert.ok(html.includes('&lt;script&gt;'));
   assert.match(html, /2:s/); assert.match(html, /Подтвердить привязку/);
+  assert.match(html, /<\/details>\s*<div class="user-quick-actions">/, 'delete action must be outside the collapsed details');
+  assert.match(html, /data-delete-user>Удалить аккаунт/);
 });
 test('users: role switch clears bearer immediately and late logout cannot clear a new login', async () => {
   let finish;
@@ -43,4 +45,10 @@ test('users: role switch clears bearer immediately and late logout cannot clear 
   await client.request('users'); assert.equal(headers.at(-1).Authorization, undefined);
   await client.login('second'); finish(new Response(null, { status: 204 })); await pending;
   assert.equal(client.authorized(), true);
+});
+test('student removal picker identifies course, escapes names and explains retained account', () => {
+  const html = studentRemovalMarkup([{ id: 's1', course: '2', displayName: '<Студент>', groupName: 'ИС', active: false }]);
+  assert.match(html, /value="2:s1"/); assert.match(html, /&lt;Студент&gt;/);
+  assert.match(html, /Сам аккаунт ЛК останется/); assert.match(html, /убран из списка/);
+  assert.match(studentRemovalMarkup([]), /data-removal-select disabled/);
 });

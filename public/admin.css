@@ -80,6 +80,21 @@ ol.steps a { color: var(--primary); text-decoration: underline; }
 .users-column-head, .user-summary { display: grid; grid-template-columns: minmax(0, 1fr) 132px 140px 20px; gap: 20px; align-items: center; }
 .users-column-head { padding: 10px 20px; background: var(--card-high); color: var(--muted); font-size: 12px; }
 .user-row { border-top: 1px solid var(--outline); }
+.user-list-item { border-top: 1px solid var(--outline); }
+.user-list-item > .user-row { border-top: 0; }
+.user-quick-actions { display: flex; justify-content: flex-end; padding: 0 20px 10px; }
+.users-source-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.users-heading-actions { display: flex; align-items: center; gap: 12px; }
+.users-heading-actions > .btn { min-height: 44px; font-size: 13px; padding: 10px 14px; }
+.users-source-actions .btn { min-height: 44px; font-size: 13px; padding: 10px 14px; }
+.student-removal-panel { scroll-margin-top: 80px; }
+.student-removal-panel[hidden] { display: none; }
+.student-removal-panel h2 { margin: 0 0 12px; color: var(--text); }
+.student-removal-panel > p { line-height: 1.5; margin: 0 0 16px; }
+.student-removal-panel > select { width: 100%; min-height: 46px; border: 1px solid var(--outline); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 16px; color: var(--text); background: var(--bg); }
+.student-removal-panel > button { margin-top: 16px; }
+@media (max-width: 620px) { .users-source { flex-wrap: wrap; } .users-source-actions { width: 100%; justify-content: flex-start; } .user-quick-actions { padding-inline: 16px; } }
+@media (max-width: 620px) { .users-heading { flex-wrap: wrap; } .users-heading-actions { width: 100%; justify-content: space-between; } }
 .user-summary { list-style: none; cursor: pointer; padding: 16px 20px; min-height: 76px; }
 .user-summary::-webkit-details-marker { display: none; }
 .user-summary:hover { background: var(--card-high); }
