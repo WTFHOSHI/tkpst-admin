@@ -1,6 +1,5 @@
-import { usersMarkup, studentRemovalMarkup } from './users-client.js?v=__V__';
-import { usersApi, syncUsers, api, currentRole, panelReady, logout } from './backend.js?v=__V__';
-import { T } from './js/core.js?v=__V__';
+import { usersMarkup } from './users-client.js?v=__V__';
+import { usersApi, syncUsers, currentRole, panelReady, logout } from './backend.js?v=__V__';
 import { showPanelLogin, panelIcon } from './login-view.js?v=__V__';
 import { showDeleteConfirmation } from './delete-confirm.js?v=__V__';
 
@@ -15,15 +14,14 @@ const message = (text, error = false) => {
 const header = () => `<header class="bar"><span class="icon-space"></span><div class="bar-title"><div class="t">Пользователи</div><div class="s">ИС-25-3С · ${currentRole() === 'admin' ? 'Администратор' : currentRole() === 'kurator' ? 'Куратор' : 'Староста'}</div></div><div class="bar-actions"><button class="icon" data-users-exit aria-label="Выйти из админ-панели">${panelIcon('out')}</button></div></header>`;
 function exitButton() { host.querySelector('[data-users-exit]').onclick = () => logout(); }
 function shell() {
-  host.innerHTML = `${header()}<main class="admin users-main"><section class="card users-toolbar"><div class="users-heading"><div><h1>Личные кабинеты</h1><p class="college">Управление аккаунтами и подтверждение студентов</p></div><div class="users-heading-actions"><button type="button" class="btn outline delete-link" data-remove-directory-student disabled>Удалить студента из группы</button><button class="small-btn users-refresh" data-users-refresh aria-label="Обновить аккаунты">${panelIcon('refresh')}<span>Обновить</span></button></div></div>
+  host.innerHTML = `${header()}<main class="admin users-main"><section class="card users-toolbar"><div class="users-heading"><div><h1>Личные кабинеты</h1><p class="college">Управление аккаунтами и подтверждение студентов</p></div><button class="small-btn users-refresh" data-users-refresh aria-label="Обновить аккаунты">${panelIcon('refresh')}<span>Обновить</span></button></div>
     <form class="users-search" data-users-search><label class="lbl" for="users-search">Поиск аккаунта</label><div class="users-search-line"><span aria-hidden="true">${panelIcon('search')}</span><input id="users-search" name="search" type="text" maxlength="120" placeholder="Имя, фамилия или логин" autocomplete="off"><button class="btn" type="submit">Найти</button></div></form>
     <div class="users-filter seg" role="group" aria-label="Статус подтверждения"><button type="button" data-filter="all" aria-pressed="true" class="on">Все</button><button type="button" data-filter="pending" aria-pressed="false">Без привязки</button><button type="button" data-filter="linked" aria-pressed="false">Подтверждённые</button></div></section>
     <p data-users-message role="status" hidden></p><section class="card users-list" data-users-list aria-label="Зарегистрированные пользователи" aria-busy="true"></section>
-    <div class="users-source"><div><strong>Список студентов</strong><p class="college" data-users-sync-date>Из раздела «Посещаемость»</p></div><div class="users-source-actions"><button class="small-btn" data-users-sync>${panelIcon('refresh')}<span>Обновить список</span></button></div></div><section class="card student-removal-panel" data-student-removal hidden></section></main>`;
+    <div class="users-source"><div><strong>Список студентов</strong><p class="college" data-users-sync-date>Из раздела «Посещаемость»</p></div><button class="small-btn" data-users-sync>${panelIcon('refresh')}<span>Обновить список</span></button></div></main>`;
   exitButton();
   host.querySelector('[data-users-search]').onsubmit = event => { event.preventDefault(); search = event.currentTarget.elements.search.value.trim().replace(/^@/, ''); offset = 0; load(); };
   host.querySelector('[data-users-refresh]').onclick = () => load();
-  host.querySelector('[data-remove-directory-student]').onclick = () => openStudentRemoval();
   host.querySelectorAll('[data-filter]').forEach(button => { button.onclick = () => { status = button.dataset.filter; offset = 0; host.querySelectorAll('[data-filter]').forEach(el => { const on = el === button; el.classList.toggle('on', on); el.setAttribute('aria-pressed', String(on)); }); load(); }; });
   host.querySelector('[data-users-sync]').onclick = async event => {
     const v = version, button = event.currentTarget; button.disabled = true; message('');
@@ -36,15 +34,12 @@ async function load(sync = false) {
   const v = version, number = ++loadNumber, list = host.querySelector('[data-users-list]'); if (!list) return;
   const focused = host.contains(document.activeElement) && document.activeElement.closest('[data-users-list]');
   list.setAttribute('aria-busy', 'true'); message(''); last = null;
-  host.querySelector('[data-remove-directory-student]').disabled = true;
-  host.querySelector('[data-student-removal]').hidden = true;
   list.innerHTML = '<div class="users-loading" role="status"><span class="users-loading-mark" aria-hidden="true"></span><span>Подключаем личные кабинеты…<br><span class="college">Бесплатный сервер может запускаться около минуты. Расписание и посещаемость доступны в соседних вкладках.</span></span></div>';
   try {
     if (sync || initialSyncRequired) { await syncUsers(controller.signal); if (!valid(v) || number !== loadNumber) return; initialSyncRequired = false; }
     const data = await usersApi('users', { search, offset, status }, controller.signal);
     if (!valid(v) || number !== loadNumber) return;
     last = data; list.innerHTML = usersMarkup(data, search, { offset, status }); list.setAttribute('aria-busy', 'false');
-    host.querySelector('[data-remove-directory-student]').disabled = !data.students.length;
     host.querySelector('[data-users-sync-date]').textContent = data.syncedAt ? 'Обновлён ' + new Date(data.syncedAt).toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' }) : 'Обновите список, чтобы загрузить студентов.';
     list.querySelector('[data-next]').onclick = () => { if (data.nextOffset !== null) { offset = data.nextOffset; load(); } };
     list.querySelector('[data-previous]').onclick = () => { offset = Math.max(0, offset - 100); load(); };
@@ -69,42 +64,11 @@ async function load(sync = false) {
 }
 function deleteAccount(row) {
   const user = last?.users.find(u => u.id === row.dataset.user); if (!user) return;
-  row.querySelector('details').open = true;
   const v = version;
   showDeleteConfirmation({ container: row.querySelector('[data-row-confirm]'), title: 'Удалить аккаунт @' + user.username + '?', expected: user.username, label: 'Для подтверждения введите логин', description: 'Аккаунт будет удалён, его сеансы завершатся, а привязка к студенту снимется. Студент и отметки в «Посещаемости» останутся. Восстановить аккаунт нельзя.', onCancel: () => row.querySelector('[data-delete-user]').focus(), onDelete: async confirmUsername => {
     await usersApi('delete-user', { userId: user.id, confirmUsername }, controller.signal);
     if (valid(v)) { if (last?.users.length === 1 && offset > 0) offset = Math.max(0, offset - 100); await load(); message('Аккаунт @' + user.username + ' удалён. Его сеансы завершены.'); }
   } });
-}
-function openStudentRemoval() {
-  if (!last) return;
-  const students = last.students.slice(), panel = host.querySelector('[data-student-removal]');
-  panel.innerHTML = studentRemovalMarkup(students); panel.hidden = false;
-  const select = panel.querySelector('[data-removal-select]');
-  panel.querySelector('[data-removal-close]').onclick = () => { panel.hidden = true; host.querySelector('[data-remove-directory-student]').focus(); };
-  select.onchange = () => {
-    const student = students.find(s => s.course + ':' + s.id === select.value), confirmation = panel.querySelector('[data-directory-delete-confirm]');
-    if (!student) { confirmation.hidden = true; return; }
-    const v = version;
-    showDeleteConfirmation({ container: confirmation, title: 'Удалить студента ' + student.displayName + '?', expected: student.displayName, label: 'Для подтверждения введите ФИО', description: 'Студент будет удалён из списка группы и отвязан от ЛК. Его имя в прежних отметках заменится на «Удалённый студент». Сам аккаунт не удаляется.', onCancel: () => select.focus(), onDelete: async confirmName => {
-      select.disabled = true;
-      try {
-        await api('students', { action: 'delete', course: student.course, id: student.id, confirmName, to: T.iso(T.dayStart(T.now())) });
-        let syncError = '';
-        try { await syncUsers(controller.signal); } catch (error) { syncError = error.message; }
-        if (!valid(v)) return;
-        panel.hidden = true;
-        if (syncError) {
-          initialSyncRequired = true; last = null;
-          host.querySelector('[data-remove-directory-student]').disabled = true;
-          host.querySelector('[data-users-list]').innerHTML = '<div class="users-empty"><h2>Список группы изменён</h2><p>Обновите список, чтобы применить изменения к личным кабинетам.</p><button class="btn outline" data-retry-removal-sync>Обновить список</button></div>';
-          host.querySelector('[data-retry-removal-sync]').onclick = () => load(true);
-          message('Студент удалён из группы. Не удалось обновить ЛК: ' + syncError, true);
-        } else { await load(); message('Студент удалён из группы, привязка к ЛК снята.'); }
-      } finally { if (select.isConnected) select.disabled = false; }
-    } });
-  };
-  select.focus(); panel.scrollIntoView({ block: 'start' });
 }
 function confirmLink(row, unlink) {
   const user = last?.users.find(u => u.id === row.dataset.user), value = row.querySelector('[data-student]').value;

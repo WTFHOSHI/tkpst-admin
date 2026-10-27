@@ -49,7 +49,7 @@ export function usersMarkup(data, search = '', { offset = 0, status = 'all' } = 
     const linked = user.link ? `${user.link.course}:${user.link.studentId}` : '';
     const initials = String(user.displayName).trim().split(/\s+/).slice(0, 2).map(s => s[0]).join('').toLocaleUpperCase('ru');
     const date = new Date(user.createdAt);
-    return `<article class="user-list-item" data-user="${esc(user.id)}"><details class="user-row"><summary class="user-summary">
+    return `<details class="user-row" data-user="${esc(user.id)}"><summary class="user-summary">
       <span class="user-person"><span class="user-avatar" aria-hidden="true">${esc(initials)}</span><span class="user-name"><strong>${esc(user.displayName)}</strong><span>@${esc(user.username)}</span></span></span>
       <span class="user-badge ${user.student ? 'verified' : ''}">${user.student ? 'Подтверждён' : 'Без привязки'}</span>
       <time class="user-date" datetime="${esc(date.toISOString())}" title="${esc(date.toLocaleString('ru-RU', { timeZone: 'Asia/Yekaterinburg' }))}">${esc(date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Yekaterinburg' }))}</time>
@@ -58,14 +58,10 @@ export function usersMarkup(data, search = '', { offset = 0, status = 'all' } = 
       <div class="user-link"><label class="lbl" for="student-${esc(user.id)}">Студент из «Посещаемости»</label><select id="student-${esc(user.id)}" data-student><option value="">Выберите студента</option>${active.map(s => `<option value="${esc(s.course + ':' + s.id)}" ${linked === s.course + ':' + s.id ? 'selected' : ''}>${esc(s.displayName)} · ${esc(s.groupName || 'Без группы')} · ${esc(s.course)} курс</option>`).join('')}</select>
       ${active.length ? '' : '<p class="college">В списке нет активных студентов. Проверьте «Посещаемость» и обновите список.</p>'}
       <div class="user-actions"><button class="btn" data-link ${active.length ? '' : 'disabled'}>Подтвердить привязку</button>${linked ? '<button class="btn outline" data-unlink>Снять привязку</button>' : ''}</div>
-      <div class="user-confirm" data-row-confirm hidden></div><p class="college user-row-status" data-row-status role="status"></p></div></div></details>
-      <div class="user-quick-actions"><button type="button" class="small-btn delete-link" data-delete-user>Удалить аккаунт</button></div></article>`;
+      <button type="button" class="small-btn delete-link" data-delete-user>Удалить аккаунт</button>
+      <div class="user-confirm" data-row-confirm hidden></div><p class="college user-row-status" data-row-status role="status"></p></div></div></details>`;
   }).join('');
   return `<div class="users-list-head"><span>${search || status !== 'all' ? 'Найдено' : 'Всего аккаунтов'}: <strong>${data.total}</strong></span><span class="college">Нажмите на аккаунт, чтобы открыть</span></div>
     ${rows ? '<div class="users-column-head" aria-hidden="true"><span>Студент / логин</span><span>Статус</span><span>Регистрация</span><span></span></div>' + rows : `<div class="users-empty"><h2>${search || status !== 'all' ? 'Подходящих аккаунтов нет' : 'Пока никто не зарегистрировался'}</h2><p>${search || status !== 'all' ? 'Измените запрос или выберите фильтр «Все».' : 'Здесь появятся студенты, которые зарегистрируются в приложении.'}</p></div>`}
     <div class="users-pagination"><span class="college">${data.total ? `${offset + 1}–${offset + data.users.length} из ${data.total}` : '0 аккаунтов'}</span><div><button class="small-btn" data-previous ${offset ? '' : 'disabled'}>Назад</button><button class="small-btn" data-next ${data.nextOffset !== null ? '' : 'disabled'}>Далее</button></div></div>`;
-}
-
-export function studentRemovalMarkup(students) {
-  return `<h2>Удалить студента из группы</h2><p class="college">ФИО исчезнет из списка группы, прежние отметки сохранятся без имени. Сам аккаунт ЛК останется.</p><label class="lbl" for="remove-directory-student">Выберите студента</label><select id="remove-directory-student" data-removal-select ${students.length ? '' : 'disabled'}><option value="">${students.length ? 'Выберите студента' : 'В списке нет студентов'}</option>${students.map(s => `<option value="${esc(s.course + ':' + s.id)}">${esc(s.displayName)} · ${esc(s.groupName || 'Без группы')} · ${esc(s.course)} курс${s.active ? '' : ' · убран из списка'}</option>`).join('')}</select><div class="user-confirm" data-directory-delete-confirm hidden></div><button type="button" class="btn outline" data-removal-close>Закрыть</button>`;
 }
