@@ -1,4 +1,4 @@
-const API = 'https://tkpst-schedule.vercel.app/api/admin/';
+const API = 'https://tkpst-schedule.onrender.com/api/admin/';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function createUsersClient(fetchImpl = fetch) {

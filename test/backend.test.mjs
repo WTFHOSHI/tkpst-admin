@@ -15,7 +15,7 @@ const cloudToken = 'a'.repeat(43);
 const commits = [];
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, headers: new Map() });
 globalThis.fetch = async (url, init = {}) => {
-  if (String(url).startsWith('https://tkpst-schedule.vercel.app/api/admin/')) {
+  if (String(url).startsWith('https://tkpst-schedule.onrender.com/api/admin/')) {
     if (url.endsWith('/login')) { cloudLogins++; return reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }); }
     assert.equal(init.headers.Authorization, 'Bearer ' + cloudToken);
     return reply(200, { ok: true });

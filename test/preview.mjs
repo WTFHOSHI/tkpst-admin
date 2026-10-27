@@ -37,7 +37,7 @@ const server = createServer(async (req, res) => {
   try {
     const file = resolve(root, '.' + (path === '/' ? '/index.html' : path)); if (!file.startsWith(resolve(root) + '\\') && !file.startsWith(resolve(root) + '/')) return json(403, {});
     let data = await readFile(file); const ext = extname(file);
-    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-schedule.vercel.app/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
+    if (ext === '.js') data = Buffer.from(data.toString().replace("const API = 'https://tkpst-schedule.onrender.com/api/admin/';", `const API = '${origin}/qa-api/';`).replace("const GH = 'https://api.github.com';", `const GH = '${origin}/qa-github';`));
     if (ext === '.html') data = Buffer.from(data.toString().replace('<body>', '<body><aside style="text-align:center;padding:6px;font-size:12px">Тестовый стенд · демонстрационные данные</aside>'));
     res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png' })[ext] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(data);
   } catch { json(404, {}); }
