@@ -55,7 +55,7 @@ async function load(sync = false) {
     list.setAttribute('aria-busy', 'false'); message(error.message, true);
     if (error.code === 'cloud_unavailable') {
       list.innerHTML = '<div class="users-empty"><h2>Личные кабинеты временно недоступны</h2><p>Основной вход в админку работает. Для повторного подключения ЛК введите пароль ещё раз; расписание и посещаемость доступны без переподключения.</p><button class="btn outline" data-users-reconnect>Подключить личные кабинеты</button><a class="btn outline" href="#att">К посещаемости</a></div>';
-      list.querySelector('[data-users-reconnect]').onclick = () => { version++; controller.abort(); const v = version; stopReconnect = showPanelLogin(host, () => { if (valid(v)) users.start(host); }, 'Повторный вход подключит личные кабинеты. Основные разделы уже доступны.'); };
+      list.querySelector('[data-users-reconnect]').onclick = () => { version++; controller.abort(); const v = version; stopReconnect = showPanelLogin(host, () => { if (valid(v)) users.start(host); }); };
       return;
     }
     list.innerHTML = '<div class="users-empty"><h2>Не удалось загрузить аккаунты</h2><p>Проверьте соединение и повторите запрос.</p><button class="btn outline" data-users-retry>Попробовать снова</button></div>';
