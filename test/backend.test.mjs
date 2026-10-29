@@ -12,6 +12,7 @@ let shaN = 0;
 let vaultText = null;
 let cloudLogins = 0;
 let cloudBlocked = false;
+let cloudRejected = false;
 let deferCloud = false, releaseCloud;
 const cloudToken = 'a'.repeat(43);
 const commits = [];
@@ -22,6 +23,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (deferCloud && url.endsWith('/login')) return new Promise(resolve => { releaseCloud = resolve; });
     if (url.endsWith('/login')) { cloudLogins++; return reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }); }
     assert.equal(init.headers.Authorization, 'Bearer ' + cloudToken);
+    if (cloudRejected) return reply(401, { error: 'Revoked fixture token' });
     return reply(200, { ok: true });
   }
   if (url === 'vault.json') return vaultText ? reply(200, JSON.parse(vaultText)) : reply(404, null);
@@ -61,20 +63,20 @@ test('сейф: роли по паролям, неверный пароль', as
   vaultText = JSON.stringify(vault);
 });
 
-test('вход, запоминание на 1 день, выход', async () => {
+test('вход администратора и старосты сохраняется без срока, выход очищает доступ', async () => {
   await assert.rejects(B.api('me'), (e) => e.status === 401);
   await assert.rejects(B.api('login', { password: 'nope-nope-nope' }), (e) => e.status === 401);
   const r = await B.api('login', { password: passwords.starosta, remember: true });
   assert.equal(r.role, 'starosta');
   const saved = JSON.parse(localStorage.getItem('admin_session'));
-  assert.ok(saved.exp > Date.now() + 864e5 - 5000 && saved.exp <= Date.now() + 864e5);
+  assert.equal(saved.exp, undefined);
   assert.equal(sessionStorage.getItem('admin_session'), null);
   B.logout();
   assert.equal(localStorage.getItem('admin_session'), null);
   assert.equal(B.loggedIn(), false);
   await B.api('login', { password: passwords.admin, remember: false });
-  assert.ok(sessionStorage.getItem('admin_session'));
-  assert.equal(localStorage.getItem('admin_session'), null);
+  assert.ok(localStorage.getItem('admin_session'));
+  assert.equal(sessionStorage.getItem('admin_session'), null);
 });
 
 test('общий вход: admin server session is persisted with vault role and reused without password', async () => {
@@ -105,26 +107,39 @@ test('blocked LK server never blocks vault login, schedule or attendance', async
   } finally { B.logout(); cloudBlocked = false; }
   await B.api('login', { password: passwords.admin });
 });
-test('background LK completion preserves unchecked remember choice despite another tab', async () => {
+test('background LK completion never overwrites a replacement session in another tab', async () => {
   deferCloud = true;
   try {
     await B.api('login', { password: passwords.admin, remember: false });
     localStorage.setItem('admin_session', JSON.stringify({ role: 'kurator', gh: 'other-tab', dk: 'other-key' }));
     releaseCloud(reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }));
-    await B.usersApi('users');
+    await assert.rejects(B.usersApi('users'), error => error.code === 'cloud_unavailable');
     assert.equal(JSON.parse(localStorage.getItem('admin_session')).role, 'kurator');
-    assert.equal(JSON.parse(sessionStorage.getItem('admin_session')).cloud.token, cloudToken);
+    assert.equal(sessionStorage.getItem('admin_session'), null);
   } finally { deferCloud = false; B.logout(); }
   await B.api('login', { password: passwords.admin });
 });
-test('общий вход: expiry returns active Users to the shared login instead of a retry loop', async () => {
-  await B.api('login', { password: passwords.admin, remember: true });
-  const saved = JSON.parse(localStorage.getItem('admin_session'));
-  const realNow = Date.now, realDispatch = globalThis.dispatchEvent; let loggedOut = 0;
-  Date.now = () => saved.exp + 1;
-  globalThis.dispatchEvent = event => { if (event.type === 'admin-logout') loggedOut++; };
-  try { await assert.rejects(B.usersApi('users'), error => error.status === 401); assert.ok(loggedOut > 0); }
-  finally { Date.now = realNow; globalThis.dispatchEvent = realDispatch; }
+test('expired cloud access preserves the permanent panel session', async () => {
+  await B.api('login', { password: passwords.admin });
+  await B.usersApi('users');
+  const realNow = Date.now;
+  Date.now = () => realNow() + 30 * 864e5;
+  try {
+    await assert.rejects(B.usersApi('users'), error => error.status === 503 && error.code === 'cloud_unavailable');
+    assert.equal(B.panelReady(), true);
+    assert.equal(B.currentRole(), 'admin');
+  } finally { Date.now = realNow; }
+  await B.api('login', { password: passwords.admin });
+});
+test('revoked server bearer only disconnects LK and keeps schedule session saved', async () => {
+  await B.api('login', { password: passwords.admin }); await B.usersApi('users');
+  cloudRejected = true;
+  try {
+    await assert.rejects(B.usersApi('users'), e => e.code === 'cloud_unavailable');
+    assert.equal(B.panelReady(), true);
+    assert.equal(JSON.parse(localStorage.getItem('admin_session')).role, 'admin');
+    assert.equal(JSON.parse(localStorage.getItem('admin_session')).cloud, undefined);
+  } finally { cloudRejected = false; }
   await B.api('login', { password: passwords.admin });
 });
 

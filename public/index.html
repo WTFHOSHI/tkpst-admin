@@ -14,12 +14,14 @@
   <link rel="stylesheet" href="admin.css?v=__V__">
 </head>
 <body>
+  <button class="skip-link" type="button" data-skip-content>К содержимому</button>
+  <header class="panel-masthead"><div class="panel-brand"><span class="panel-brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 11h18m-13 5 3 3 5-5"/></svg></span><div><strong>ТКПСТ</strong><span>Управление группой</span></div></div><div class="panel-masthead-actions"><div class="panel-session" data-session-label>Доступ по паролю</div><button type="button" class="icon" data-admin-theme aria-label="Переключить тему"></button></div></header>
   <nav class="admin-tabs" aria-label="Разделы">
-    <a href="#schedule" data-tab="schedule"><span class="long">Изменение расписания</span><span class="short">Расписание</span></a>
+    <a href="#schedule" data-tab="schedule">Расписание</a>
     <a href="#att" data-tab="att">Посещаемость</a>
     <a href="#users" data-tab="users">Пользователи</a>
   </nav>
-  <div id="app"></div>
+  <div id="app" tabindex="-1"></div>
   <script type="module" src="main.js?v=__V__"></script>
 </body>
 </html>

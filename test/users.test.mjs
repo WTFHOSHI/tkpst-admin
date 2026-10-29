@@ -15,6 +15,18 @@ test('users: token is sent only to fixed API, never cookies, logout revokes and 
   await assert.rejects(client.request('https://evil.example'), /адрес/i);
 });
 
+test('users: no-expiry server credentials survive reload and years until logout', async () => {
+  const client = createUsersClient(async () => Response.json({ token: 'permanent-token', expiresAt: 0 }));
+  await client.login('fixture-password');
+  const saved = client.credentials(); assert.equal(saved.expiresAt, 0);
+  const realNow = Date.now; Date.now = () => realNow() + 10 * 365 * 864e5;
+  try {
+    const reloaded = createUsersClient(async () => new Response(null, { status: 204 }));
+    reloaded.restore(saved); assert.equal(reloaded.authorized(), true);
+    await reloaded.logout(); assert.equal(reloaded.authorized(), false);
+  } finally { Date.now = realNow; }
+});
+
 test('users: 401 clears authorization, late login cannot restore a cleared session', async () => {
   let resolve;
   const client = createUsersClient(() => new Promise(r => { resolve = r; }));

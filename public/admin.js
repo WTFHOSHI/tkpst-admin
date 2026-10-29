@@ -181,7 +181,7 @@ async function collegeDay(day) {
 function editor() {
   $app.innerHTML = `
     <header class="bar"><span class="icon-space"></span>
-      <div class="bar-title"><div class="t">Админ-панель</div><div class="s">ИС-25-3С · ${esc(me.title)} · изменения видны на сайте и в приложениях</div></div>
+      <div class="bar-title"><div class="t" role="heading" aria-level="1">Расписание</div><div class="s">ИС-25-3С · изменения видны на сайте и в приложениях</div></div>
       <div class="bar-actions"><button class="icon" data-logout aria-label="Выйти">${I.out}</button></div></header>
     <main class="admin">
       <div class="card">

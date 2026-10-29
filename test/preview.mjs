@@ -28,7 +28,7 @@ const server = createServer(async (req, res) => {
   }
   if (path.startsWith('/qa-api/')) {
     const chunks = []; for await (const chunk of req) chunks.push(chunk); const body = JSON.parse(Buffer.concat(chunks).toString() || '{}');
-    if (path.endsWith('/login')) return body.password === passwords.admin ? json(200, { token, expiresAt: Date.now() + 864e5 }) : json(401, { error: 'Неверный тестовый пароль' });
+    if (path.endsWith('/login')) return body.password === passwords.admin ? json(200, { token, expiresAt: 0 }) : json(401, { error: 'Неверный тестовый пароль' });
     if (req.headers.authorization !== 'Bearer ' + token) return json(401, { error: 'Нужен тестовый вход' });
     if (path.endsWith('/users')) { const list = users.filter(u => (!body.search || (u.displayName + u.username).toLowerCase().includes(body.search.toLowerCase())) && (!body.status || body.status === 'all' || (body.status === 'linked' ? !!u.student : !u.student))); return json(200, { users: list, students, total: list.length, nextOffset: null, syncedAt: Date.now() }); }
     if (path.endsWith('/link')) { const user = users.find(u => u.id === body.userId); user.student = students.find(s => s.id === body.studentId) || null; user.link = user.student ? { course: body.course, studentId: body.studentId } : null; return json(200, { ok: true }); }

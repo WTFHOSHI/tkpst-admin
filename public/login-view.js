@@ -6,14 +6,17 @@ export const panelIcon = name => {
   return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ''}</svg>`;
 };
 export function loginMarkup(note = '') {
-  return `<header class="bar"><span class="icon-space"></span><div class="bar-title"><div class="t">Админ-панель</div><div class="s">ИС-25-3С · единый вход</div></div><span class="icon-space"></span></header>
-    <main class="admin panel-login"><section class="card"><h1>Вход по паролю</h1><p class="college panel-login-intro">Один вход для расписания, посещаемости и пользователей. Введите пароль своей роли.</p>
-    <form data-panel-login><label class="lbl" for="panel-password">Пароль</label><div class="panel-password"><input id="panel-password" name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" maxlength="256" required><button type="button" class="icon" data-show-password aria-label="Показать пароль" aria-pressed="false">${panelIcon('eye')}</button></div>
-    <label class="panel-remember"><input type="checkbox" name="remember">Запомнить на этом устройстве на 1 день</label>
+  return `<main class="admin panel-login">
+    <section class="panel-welcome" aria-labelledby="welcome-title"><h1 id="welcome-title">Всё для работы<br>с группой.</h1><p class="panel-lead">Один вход для расписания, посещаемости и пользователей.</p>
+      <dl class="panel-features"><div><dt>Расписание</dt><dd>Изменения пар, звонков и объявления</dd></div><div><dt>Посещаемость</dt><dd>Отметки, список студентов и выгрузка</dd></div><div><dt>Личные кабинеты</dt><dd>Аккаунты и привязка студентов — для администратора</dd></div></dl>
+    </section>
+    <section class="card panel-login-card" aria-labelledby="login-title"><div class="panel-login-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><h2 id="login-title">Вход в панель</h2><p class="college panel-login-intro">Введите пароль. Мы определим вашу роль автоматически.</p>
+    <form data-panel-login><label class="lbl" for="panel-password">Пароль доступа</label><div class="panel-password"><input id="panel-password" name="password" type="password" autocomplete="current-password" placeholder="Введите пароль своей роли" maxlength="256" aria-describedby="panel-session-policy" required><button type="button" class="icon" data-show-password aria-label="Показать пароль" aria-pressed="false">${panelIcon('eye')}</button></div>
     <p class="warn" data-login-error role="alert" ${note ? '' : 'hidden'}>${escapeHtml(note)}</p>
-    <button class="btn panel-submit" type="submit">Войти в админ-панель</button></form>
-    <p class="college panel-login-foot">На общем устройстве не включайте запоминание и выходите после работы.</p></section>
-    <div class="panel-access-note"><p class="college">Расписание и посещаемость доступны администратору, старосте и куратору. Управление аккаунтами — администратору.</p><a href="setup.html">Настройка админ-панели</a></div></main>`;
+    <button class="btn panel-submit" type="submit"><span>Войти в админ-панель</span>${panelIcon('next')}</button></form>
+    <dl class="panel-session-policy" id="panel-session-policy"><div><dt>Администратор и староста</dt><dd>Вход сохраняется до выхода из панели</dd></div><div><dt>Куратор</dt><dd>Вход действует до закрытия вкладки</dd></div></dl>
+    <p class="college panel-login-foot">На общем устройстве нажимайте «Выйти» после работы.</p></section>
+    <footer class="panel-access-note"><span>Доступ предоставляется по паролю вашей роли</span><a href="setup.html">Настройка админ-панели</a></footer></main>`;
 }
 export function showPanelLogin(host, onSuccess, note = '') {
   const controller = new AbortController(); host.innerHTML = loginMarkup(note);
@@ -24,14 +27,14 @@ export function showPanelLogin(host, onSuccess, note = '') {
   };
   form.onsubmit = async event => {
     event.preventDefault(); if (button.disabled) return;
-    const password = input.value, remember = form.elements.remember.checked;
-    input.value = ''; button.disabled = true; button.textContent = 'Проверяем доступ…'; error.hidden = true; form.setAttribute('aria-busy', 'true');
+    const password = input.value;
+    input.value = ''; button.disabled = true; button.textContent = 'Проверяем доступ…'; error.hidden = true; input.removeAttribute('aria-invalid'); form.setAttribute('aria-busy', 'true');
     try {
-      await api('login', { password, remember });
+      await api('login', { password });
       if (!controller.signal.aborted) onSuccess();
     } catch (e) {
       if (controller.signal.aborted) return;
-      error.textContent = e.status === 401 ? 'Неверный пароль или вход отменён. Повторите попытку.' : e.message; error.hidden = false;
+      error.textContent = e.status === 401 ? 'Неверный пароль или вход отменён. Повторите попытку.' : e.message; error.hidden = false; input.setAttribute('aria-invalid', 'true');
       button.disabled = false; button.textContent = 'Войти в админ-панель'; form.setAttribute('aria-busy', 'false'); input.focus();
     }
   };

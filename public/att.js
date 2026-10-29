@@ -235,7 +235,7 @@ function goMonth(delta) {
 function shell() {
   $app.innerHTML = `
     <header class="bar"><span class="icon-space"></span>
-      <div class="bar-title"><div class="t">Посещаемость</div><div class="s" data-sub></div></div>
+      <div class="bar-title"><div class="t" role="heading" aria-level="1">Посещаемость</div><div class="s" data-sub></div></div>
       <div class="bar-actions"><button class="icon" data-logout aria-label="Выйти">${I.out}</button></div></header>
     <main class="admin att" data-att>
       <div class="seg three" data-courses>${['1', '2', '3'].map((c) => `<button data-c="${c}">${c} курс</button>`).join('')}</div>

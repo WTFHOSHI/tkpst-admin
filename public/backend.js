@@ -22,7 +22,6 @@ export const SCHEDULE_REPO = 'tkpst-schedule';
 const OVERRIDES = 'web/overrides.json';
 const GH = 'https://api.github.com';
 const SESSION_KEY = 'admin_session';
-export const REMEMBER_MS = 864e5;      // «Запомнить на этом устройстве» — 1 день
 export const KDF_ITER = 600000;        // PBKDF2-SHA256: подбор пароля по украденному сейфу очень медленный
 
 // ---------------- Шифрование ----------------
@@ -107,14 +106,22 @@ const ls = (k, v, where = localStorage) => {
   return null;
 };
 
+const sessionStorageFor = role => role === 'kurator' ? sessionStorage : localStorage;
+const cloudActive = cloud => !!cloud && (cloud.expiresAt === 0 || cloud.expiresAt > Date.now());
 function session() {
-  if (S && (!S.exp || S.exp > Date.now())) return S;
+  if (S) return S;
   S = null; dataKey = null;
   for (const where of [sessionStorage, localStorage]) {
     let s = null;
     try { s = JSON.parse(ls(SESSION_KEY, undefined, where) || 'null'); } catch { s = null; }
-    if (s && ROLES[s.role] && s.gh && s.dk && (!s.exp || s.exp > Date.now())) { S = s; return S; }
-    if (s) ls(SESSION_KEY, null, where); // истёк — стираем
+    if (s && ROLES[s.role] && s.gh && s.dk && (s.role !== 'kurator' || where === sessionStorage)) {
+      // Migrate the previous one-day policy without asking privileged roles to log in again.
+      delete s.exp; S = s;
+      if (where !== sessionStorageFor(s.role)) ls(SESSION_KEY, null, where);
+      ls(SESSION_KEY, JSON.stringify(s), sessionStorageFor(s.role));
+      return S;
+    }
+    if (s) ls(SESSION_KEY, null, where);
   }
   return null;
 }
@@ -127,12 +134,21 @@ export async function usersApi(path, body, signal) {
   const s = session();
   if (!s) { logout(); throw fail('Вход истёк. Войдите в админ-панель заново.', 401); }
   if (s.role !== 'admin') throw fail('Аккаунты доступны только администратору.', 403);
-  if ((!s.cloud || s.cloud.expiresAt <= Date.now()) && cloudConnection?.owner === s) await cloudConnection.promise;
+  if (!cloudActive(s.cloud) && cloudConnection?.owner === s) await cloudConnection.promise;
   if (session() !== s) throw fail('Вход отменён. Войдите заново.', 401);
-  if (!s.cloud || s.cloud.expiresAt <= Date.now()) throw fail('Сервис личных кабинетов недоступен по этой сети. Расписание и посещаемость доступны в соседних вкладках.', 503, 'cloud_unavailable');
+  if (!cloudActive(s.cloud)) throw fail('Нужно переподключить личные кабинеты. Расписание и посещаемость доступны в соседних вкладках.', 503, 'cloud_unavailable');
   usersClient.restore(s.cloud);
+  const storedSession = JSON.stringify(s);
   try { return await usersClient.request(path, body, signal); }
-  catch (error) { if (error.status === 401 && session() === s) logout(); throw error; }
+  catch (error) {
+    if (error.status === 401 && session() === s) {
+      delete s.cloud;
+      const storage = sessionStorageFor(s.role);
+      if (ls(SESSION_KEY, undefined, storage) === storedSession) ls(SESSION_KEY, JSON.stringify(s), storage);
+      throw fail('Доступ к личным кабинетам отозван. Подключите их заново; основные разделы доступны.', 503, 'cloud_unavailable');
+    }
+    throw error;
+  }
 }
 
 export async function syncUsers(signal) {
@@ -156,12 +172,11 @@ export function logout() {
   ls(SESSION_KEY, null, sessionStorage);
 }
 
-/** Начать сессию. remember — запомнить на устройстве на 1 день, иначе — до закрытия вкладки. */
+/** Роль определяет срок: админ/староста до выхода, куратор до закрытия вкладки. */
 export function startSession(secret, remember, cloud = null) {
   logout();
-  S = { role: secret.role, gh: secret.gh, dk: secret.dk, ...(cloud ? { cloud } : {}), exp: Math.min(Date.now() + REMEMBER_MS, cloud?.expiresAt || Infinity) };
-  if (remember) ls(SESSION_KEY, JSON.stringify(S), localStorage);
-  else ls(SESSION_KEY, JSON.stringify(S), sessionStorage);
+  S = { role: secret.role, gh: secret.gh, dk: secret.dk, ...(cloud ? { cloud } : {}) };
+  ls(SESSION_KEY, JSON.stringify(S), sessionStorageFor(secret.role));
 }
 
 export async function loadVault() {
@@ -299,7 +314,7 @@ export async function api(path, body) {
     if (version !== loginVersion) throw fail('Вход отменён. Повторите попытку.', 401);
     startSession(secret, !!(body && body.remember));
     if (secret.role === 'admin') {
-      const storage = body.remember ? localStorage : sessionStorage;
+      const storage = sessionStorageFor(secret.role);
       const storedSession = ls(SESSION_KEY, undefined, storage);
       const owner = session(), controller = new AbortController(), exchange = createUsersClient();
       const connection = { owner, controller, promise: null };
@@ -307,7 +322,7 @@ export async function api(path, body) {
       connection.promise = exchange.login(String(body.password), controller.signal).then(() => {
         if (session() !== owner || ls(SESSION_KEY, undefined, storage) !== storedSession) { exchange.logout().catch(() => {}); return; }
         owner.cloud = exchange.credentials();
-        if (owner.cloud) { owner.exp = Math.min(owner.exp, owner.cloud.expiresAt); ls(SESSION_KEY, JSON.stringify(owner), storage); }
+        if (owner.cloud) ls(SESSION_KEY, JSON.stringify(owner), storage);
       }).catch(() => {});
     }
     return { token: 'ok', role: secret.role, title: ROLES[secret.role].title };

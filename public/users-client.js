@@ -23,16 +23,16 @@ export function createUsersClient(fetchImpl = fetch) {
     return data || {};
   }
   return {
-    request, clear, authorized: () => !!token && expiresAt > Date.now(),
+    request, clear, authorized: () => !!token && (expiresAt === 0 || expiresAt > Date.now()),
     credentials: () => token ? { token, expiresAt } : null,
     restore(saved) {
-      if (!saved || typeof saved.token !== 'string' || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now()) { clear(); return; }
+      if (!saved || typeof saved.token !== 'string' || !Number.isFinite(saved.expiresAt) || saved.expiresAt !== 0 && saved.expiresAt <= Date.now()) { clear(); return; }
       if (saved.token !== token || saved.expiresAt !== expiresAt) { token = saved.token; expiresAt = saved.expiresAt; revision++; }
     },
     async login(password, signal) {
       const version = revision;
       const data = await request('login', { password }, signal);
-      if (version === revision && !signal?.aborted) { token = data.token; expiresAt = data.expiresAt || Date.now() + 864e5; revision++; }
+      if (version === revision && !signal?.aborted) { token = data.token; expiresAt = data.expiresAt ?? Date.now() + 864e5; revision++; }
       return data;
     },
     async logout() {
