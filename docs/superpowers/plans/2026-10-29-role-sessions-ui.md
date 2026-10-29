@@ -6,10 +6,12 @@ Approach: Keep the current plain JavaScript application and olive visual identit
 
 UI: A clearer single password form with role-specific persistence explanation, visible password toggle and loading/error states. A consistent application masthead, accessible section navigation, session role/status, larger form controls and coherent desktop/mobile layouts across schedule, attendance and users. Account deletion stays inside details.
 
-- [ ] Add behavior tests for persistent sessions, curator storage, migration, stale cloud and server revocation.
-- [ ] Implement role storage and no-expiry cloud bearer without weakening permissions or network independence.
-- [ ] Refine login, shared navigation and working surfaces; retain all editing flows.
+- [x] Add behavior tests for persistent sessions, curator storage, migration, stale cloud and server revocation.
+- [x] Implement role storage and no-expiry cloud bearer without weakening permissions or network independence.
+- [x] Refine login, shared navigation and working surfaces; retain all editing flows.
 - [ ] Run both complete test suites and inspect synthetic desktop/mobile UI.
 - [ ] Review, commit, publish and verify the deployed assets/services.
 
 Review focus: cloud 401 must not log out the whole app; background login must not overwrite a replacement session; expired legacy admin can migrate; curator local storage must not survive a restart; logout and vault rotation must revoke indefinite server tokens.
+
+Review: cross-tab cached credentials now invalidate on sessionId removal/replacement and refresh the UI; the masthead listens for every role change. Independent review found no remaining blocker. Preserved and merged newer attendance publishing code; its writer sessions use the same role lifetime policy (admin/starosta no expiry, curator session storage plus bounded server token).

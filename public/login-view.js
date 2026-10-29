@@ -7,7 +7,7 @@ export const panelIcon = name => {
 };
 export function loginMarkup(note = '') {
   return `<main class="admin panel-login">
-    <section class="panel-welcome" aria-labelledby="welcome-title"><h1 id="welcome-title">Всё для работы<br>с группой.</h1><p class="panel-lead">Один вход для расписания, посещаемости и пользователей.</p>
+    <section class="panel-welcome" aria-labelledby="welcome-title"><h1 id="welcome-title">Всё для работы <br>с группой.</h1><p class="panel-lead">Один вход для расписания, посещаемости и пользователей.</p>
       <dl class="panel-features"><div><dt>Расписание</dt><dd>Изменения пар, звонков и объявления</dd></div><div><dt>Посещаемость</dt><dd>Отметки, список студентов и выгрузка</dd></div><div><dt>Личные кабинеты</dt><dd>Аккаунты и привязка студентов — для администратора</dd></div></dl>
     </section>
     <section class="card panel-login-card" aria-labelledby="login-title"><div class="panel-login-symbol" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div><h2 id="login-title">Вход в панель</h2><p class="college panel-login-intro">Введите пароль. Мы определим вашу роль автоматически.</p>

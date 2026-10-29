@@ -35,6 +35,8 @@ function renderSession() {
   label.dataset.saved = role ? (role === 'kurator' ? 'До закрытия вкладки' : 'Вход сохранён') : '';
 }
 
+window.addEventListener('admin-session-change', renderSession);
+window.addEventListener('admin-storage-change', () => location.reload());
 function open(name) {
   if (name === current) return;
   if (current && tabs[current].dirty()) {

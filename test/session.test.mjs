@@ -37,3 +37,12 @@ test('legacy privileged sessions migrate to persistent storage; legacy persisten
   assert.equal((await reload()).panelReady(), false);
   assert.equal(localStorage.getItem(key), null);
 });
+test('logout and replacement in another tab invalidate cached privileged access', async () => {
+  const first = await reload(); first.startSession(secret('starosta'));
+  const second = await reload(); assert.equal(second.currentRole(), 'starosta');
+  second.logout(); assert.equal(first.panelReady(), false);
+  first.startSession(secret('admin'));
+  const third = await reload(); assert.equal(third.currentRole(), 'admin');
+  first.startSession(secret('starosta'));
+  assert.equal(third.currentRole(), 'starosta');
+});

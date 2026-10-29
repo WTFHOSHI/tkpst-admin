@@ -95,6 +95,7 @@ function fail(message, status = 400, code) {
 // ---------------- Вход и сессия ----------------
 
 let S = null;        // {role, gh, dk, exp?}
+let volatileSession = false;
 let dataKey = null;
 const usersClient = createUsersClient();
 let loginVersion = 0;
@@ -118,14 +119,24 @@ const ls = (k, v, where = localStorage) => {
 const sessionStorageFor = role => role === 'kurator' ? sessionStorage : localStorage;
 const cloudActive = cloud => !!cloud && (cloud.expiresAt === 0 || cloud.expiresAt > Date.now());
 function session() {
-  if (S) return S;
+  if (S) {
+    if (volatileSession) return S;
+    let stored;
+    try { stored = JSON.parse(ls(SESSION_KEY, undefined, sessionStorageFor(S.role)) || 'null'); } catch { /* damaged storage */ }
+    if (stored?.sessionId === S.sessionId && stored.role === S.role && stored.gh === S.gh && stored.dk === S.dk) return S;
+    // Another tab logged out or replaced the shared identity. Drop the cached key.
+    cloudConnection?.controller.abort(); cloudConnection = null;
+    attendanceConnection?.controller.abort(); attendanceConnection = null;
+    usersClient.clear(); attendanceClient.clear();
+    attendanceVersions.clear(); attendanceHistory.clear(); attendanceQueues.clear();
+  }
   S = null; dataKey = null;
   for (const where of [sessionStorage, localStorage]) {
     let s = null;
     try { s = JSON.parse(ls(SESSION_KEY, undefined, where) || 'null'); } catch { s = null; }
     if (s && ROLES[s.role] && s.gh && s.dk && (s.role !== 'kurator' || where === sessionStorage)) {
       // Migrate the previous one-day policy without asking privileged roles to log in again.
-      delete s.exp; S = s;
+      delete s.exp; s.sessionId ||= crypto.randomUUID(); S = s; volatileSession = false;
       if (where !== sessionStorageFor(s.role)) ls(SESSION_KEY, null, where);
       ls(SESSION_KEY, JSON.stringify(s), sessionStorageFor(s.role));
       return S;
@@ -147,13 +158,12 @@ export async function usersApi(path, body, signal) {
   if (session() !== s) throw fail('Вход отменён. Войдите заново.', 401);
   if (!cloudActive(s.cloud)) throw fail('Нужно переподключить личные кабинеты. Расписание и посещаемость доступны в соседних вкладках.', 503, 'cloud_unavailable');
   usersClient.restore(s.cloud);
-  const storedSession = JSON.stringify(s);
   try { return await usersClient.request(path, body, signal); }
   catch (error) {
     if (error.status === 401 && session() === s) {
       delete s.cloud;
       const storage = sessionStorageFor(s.role);
-      if (ls(SESSION_KEY, undefined, storage) === storedSession) ls(SESSION_KEY, JSON.stringify(s), storage);
+      if (sameStoredSession(s, storage)) ls(SESSION_KEY, JSON.stringify(s), storage);
       throw fail('Доступ к личным кабинетам отозван. Подключите их заново; основные разделы доступны.', 503, 'cloud_unavailable');
     }
     throw error;
@@ -243,8 +253,10 @@ export function logout() {
   attendanceVersions.clear(); attendanceHistory.clear(); attendanceQueues.clear();
   globalThis.dispatchEvent?.(new Event('admin-logout'));
   S = null; dataKey = null;
+  volatileSession = false;
   ls(SESSION_KEY, null, localStorage);
   ls(SESSION_KEY, null, sessionStorage);
+  globalThis.dispatchEvent?.(new Event('admin-session-change'));
 }
 
 /** Роль определяет срок: админ/староста до выхода, куратор до закрытия вкладки. */
@@ -252,8 +264,18 @@ export function startSession(secret, remember, cloud = null) {
   logout();
   S = { role: secret.role, gh: secret.gh, dk: secret.dk, sessionId: crypto.randomUUID(), ...(cloud ? { cloud } : {}) };
   ls(SESSION_KEY, JSON.stringify(S), sessionStorageFor(secret.role));
-
+  volatileSession = !ls(SESSION_KEY, undefined, sessionStorageFor(secret.role));
+  globalThis.dispatchEvent?.(new Event('admin-session-change'));
 }
+
+globalThis.addEventListener?.('storage', event => {
+  if (event.key !== SESSION_KEY || event.storageArea !== localStorage || S?.role === 'kurator') return;
+  let previous, next;
+  try { previous = JSON.parse(event.oldValue || 'null'); next = JSON.parse(event.newValue || 'null'); } catch { /* force refresh */ }
+  if (previous?.sessionId && previous.sessionId === next?.sessionId) return;
+  session();
+  globalThis.dispatchEvent?.(new Event('admin-storage-change'));
+});
 
 export async function loadVault() {
   let r, data;

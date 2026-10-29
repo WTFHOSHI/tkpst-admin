@@ -24,3 +24,12 @@ test('late login and expired writer cannot restore credentials after logout',asy
   client.restore({token,expiresAt:Date.now()-1});assert.equal(client.credentials(),null);
   client.restore({token,expiresAt:Date.now()+60000});assert.equal(client.credentials().token,token);
 });
+
+test('persistent attendance writer is usable after reload and passage of years', async () => {
+  const client = createAttendanceClient(async () => reply({ token, expiresAt: 0 }));
+  await client.login('Fixture password', 'starosta');
+  const saved = client.credentials(); assert.equal(saved.expiresAt, 0);
+  const realNow = Date.now; Date.now = () => realNow() + 5 * 365 * 864e5;
+  try { const other = createAttendanceClient(); other.restore(saved); assert.equal(other.credentials().token, token); }
+  finally { Date.now = realNow; }
+});

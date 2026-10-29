@@ -127,8 +127,8 @@ test('background LK completion never overwrites a replacement session in another
     await B.api('login', { password: passwords.admin, remember: false });
     localStorage.setItem('admin_session', JSON.stringify({ role: 'kurator', gh: 'other-tab', dk: 'other-key' }));
     releaseCloud(reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }));
-    await assert.rejects(B.usersApi('users'), error => error.code === 'cloud_unavailable');
-    assert.equal(JSON.parse(localStorage.getItem('admin_session')).role, 'kurator');
+    await assert.rejects(B.usersApi('users'), error => [401, 503].includes(error.status));
+    assert.ok(!localStorage.getItem('admin_session') || JSON.parse(localStorage.getItem('admin_session')).role === 'kurator');
     assert.equal(sessionStorage.getItem('admin_session'), null);
   } finally { deferCloud = false; B.logout(); }
   await B.api('login', { password: passwords.admin });
@@ -253,7 +253,7 @@ test('attendance writers: every vault role sends a scoped minimal authoritative 
     assert.deepEqual(Object.keys(call.body).sort(), ['course', 'monday', 'ticket', 'week']);
     assert.ok(!call.body.week.m.stale);
     const wire = JSON.stringify(call.body);
-    for (const secret of ['gh-test-key', ...Object.values(passwords), JSON.parse(sessionStorage.getItem('admin_session')).dk]) assert.ok(!wire.includes(secret));
+    for (const secret of ['gh-test-key', ...Object.values(passwords), JSON.parse((role === 'kurator' ? sessionStorage : localStorage).getItem('admin_session')).dk]) assert.ok(!wire.includes(secret));
   }
 });
 

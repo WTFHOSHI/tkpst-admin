@@ -4,7 +4,8 @@ const API = 'https://tkpst-api.onrender.com/api/admin/attendance/';
 export function createAttendanceClient(fetchImpl = fetch) {
   let saved = null, revision = 0;
   const clear = () => { saved = null; revision++; };
-  const credentials = () => saved && saved.expiresAt > Date.now() ? { ...saved } : null;
+  const validExpiry = value => Number.isFinite(value) && (value === 0 || value > Date.now());
+  const credentials = () => saved && validExpiry(saved.expiresAt) ? { ...saved } : null;
   async function request(path, body = {}, signal) {
     if (!['login', 'start', 'sync', 'logout'].includes(path)) throw new Error('Неизвестный адрес посещаемости.');
     const version = revision, auth = credentials();
@@ -28,7 +29,7 @@ export function createAttendanceClient(fetchImpl = fetch) {
   return {
     request, clear, credentials,
     restore(value) {
-      if (!value || !/^[A-Za-z0-9_-]{43}$/.test(value.token || '') || !Number.isFinite(value.expiresAt) || value.expiresAt <= Date.now()) { clear(); return; }
+      if (!value || !/^[A-Za-z0-9_-]{43}$/.test(value.token || '') || !validExpiry(value.expiresAt)) { clear(); return; }
       if (value.token !== saved?.token || value.expiresAt !== saved?.expiresAt) { saved = { token: value.token, expiresAt: value.expiresAt }; revision++; }
     },
     async login(password, role, signal) {
@@ -36,7 +37,7 @@ export function createAttendanceClient(fetchImpl = fetch) {
       const version = revision;
       const data = await request('login', { password, role }, signal);
       if (version === revision && !signal?.aborted) {
-        if (!/^[A-Za-z0-9_-]{43}$/.test(data.token || '') || !Number.isFinite(data.expiresAt) || data.expiresAt <= Date.now()) throw new Error('Сервис посещаемости не подтвердил вход.');
+        if (!/^[A-Za-z0-9_-]{43}$/.test(data.token || '') || !validExpiry(data.expiresAt)) throw new Error('Сервис посещаемости не подтвердил вход.');
         saved = { token: data.token, expiresAt: data.expiresAt }; revision++;
       }
       return data;
