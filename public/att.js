@@ -1,13 +1,13 @@
 import { showPanelLogin } from './login-view.js?v=__V__';
 import { showDeleteConfirmation } from './delete-confirm.js?v=__V__';
 // Вкладка «Посещаемость» админ-панели. Данные — в приватном репозитории tkpst-admin-data, зашифрованы (см. backend.js):
-// сайт расписания и приложения Android/iOS их не видят.
+// ЛК получает отдельную защищённую копию отметок, только для привязанного студента.
 import { T, buildTimeline, setOverrides, parseLessons } from './js/core.js?v=__V__';
 import {
   MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
   weeksOfMonth, monthOfWeek, activeStudents, dayPairs, studentTotals, attendanceWorkbook, buildXlsx, parseOldXlsx,
 } from './att-core.js?v=__V__';
-import { api as backend, loggedIn, logout, syncUsers } from './backend.js?v=__V__';
+import { api as backend, loggedIn, logout, syncUsers, syncAttendanceHistory } from './backend.js?v=__V__';
 
 const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname); // локальная проверка
 const SCHED = LOCAL ? '/sched' : 'https://api.thisishyum.ru/schedule_api/tyumen';
@@ -38,8 +38,10 @@ const st = {
   inflight: false, saveErr: '', saveTimer: null, pollTimer: null,
   schedule: new Map(),  // 'gid|iso' → {pairs, titles} | {error}
   overridesLoaded: false,
+  lkBusy: false, lkText: '', lkError: false,
   panel: '',            // '', 'students', 'export', 'settings'
 };
+let historyController = null;
 try { Object.assign(st, JSON.parse(store.get(PREF_KEY) || '{}')); } catch { /* ignore */ }
 const savePrefs = () => store.set(PREF_KEY, JSON.stringify({ course: st.course, view: st.view, brush: st.brush }));
 const can = (what) => ({ students: ['admin', 'starosta', 'kurator'], settings: ['admin', 'starosta'], import: ['admin', 'starosta'], export: ['admin', 'starosta', 'kurator'] }[what] || []).includes(st.role);
@@ -178,9 +180,51 @@ async function loadWeek(silent = false) {
   }
 }
 
+function renderLkStatus() {
+  const status = $app?.querySelector('[data-lk-status]');
+  if (status) { status.textContent = st.lkText; status.classList.toggle('warn', st.lkError); }
+  const button = $app?.querySelector('[data-lk-sync]');
+  if (button) { button.disabled = st.lkBusy; button.textContent = st.lkBusy ? 'Обновляю ЛК…' : 'Обновить ЛК'; }
+}
+
+function cancelHistory() { historyController?.abort(); historyController = null; st.lkBusy = false; }
+async function updateLk(force = false) {
+  cancelHistory();
+  const controller = new AbortController(), selectedCourse = st.course;
+  historyController = controller;
+  st.lkBusy = true; st.lkError = false; st.lkText = 'Обновляю посещаемость в ЛК…'; renderLkStatus();
+  try {
+    if (force) {
+      await flush();
+      if (st.pending.size || st.inflight) throw new Error('Дождитесь сохранения отметок, затем обновите ЛК ещё раз.');
+    }
+    const result = await syncAttendanceHistory(selectedCourse, { force, signal: controller.signal, onProgress({ done, failed, total }) {
+      if (historyController !== controller) return;
+      st.lkText = `Обновляю ЛК: ${done + failed} из ${total} недель…`; renderLkStatus();
+    } });
+    if (historyController !== controller) return;
+    st.lkError = result.failed > 0;
+    st.lkText = result.failed ? `Не удалось передать ${result.failed} недель в ЛК. Отметки в админке сохранены. Нажмите «Обновить ЛК» для повторной попытки.`
+      : result.total ? 'Посещаемость передана в ЛК. Новые отметки обновляются автоматически.' : 'Сохранённых недель пока нет. Новые отметки появятся в ЛК после сохранения.';
+  } catch (error) {
+    if (historyController !== controller || controller.signal.aborted) return;
+    st.lkError = true; st.lkText = error.message;
+  } finally {
+    if (historyController === controller) { st.lkBusy = false; historyController = null; renderLkStatus(); }
+  }
+}
+function onAttendanceSync({ detail }) {
+  if (!detail || detail.course !== st.course || st.lkBusy || !$app?.querySelector('[data-att]')) return;
+  st.lkError = detail.state === 'error';
+  st.lkText = detail.state === 'loading' ? 'Передаю отметки в ЛК…' : detail.state === 'ready'
+    ? 'Отметки переданы в ЛК.' : `${detail.message} Нажмите «Обновить ЛК» для повторной попытки.`;
+  renderLkStatus();
+}
+
 // ---------------- Вход ----------------
 
 function login(error = '') {
+  cancelHistory();
   stopPoll();
   showPanelLogin($app, boot, error);
 }
@@ -197,6 +241,7 @@ async function boot() {
     shell();
     loadWeek();
     startPoll();
+    updateLk();
   } catch (e) {
     if (e.status === 401) return;
     $app.innerHTML = `<main class="admin"><div class="card warn">Не удалось загрузить: ${esc(e.message)}</div><button class="btn" data-retry>Ещё раз</button></main>`;
@@ -253,7 +298,9 @@ function shell() {
         <button class="small-btn" data-panel="pairs">Пары</button>
         ${can('students') ? '<button class="small-btn" data-panel="students">Студенты</button>' : ''}
         ${can('import') ? '<button class="small-btn" data-panel="settings">Загрузить таблицу</button>' : ''}
+        <button class="small-btn" data-lk-sync>Обновить ЛК</button>
       </div>
+      <p class="college" data-lk-status role="status" aria-live="polite"></p>
       <div data-panelbox></div>
       <div class="att-content" data-content></div>
     </main>
@@ -268,7 +315,8 @@ function shell() {
     if (st.pending.size && !confirm('Не все отметки сохранены. Выйти всё равно?')) return;
     logout(); st.pending.clear(); login();
   };
-  $app.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { st.course = b.dataset.c; savePrefs(); st.panel = st.panel === 'settings' ? st.panel : ''; renderNav(); renderPanel(); loadWeek(); }; });
+  $app.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { st.course = b.dataset.c; savePrefs(); st.panel = st.panel === 'settings' ? st.panel : ''; renderNav(); renderPanel(); loadWeek(); updateLk(); }; });
+  $app.querySelector('[data-lk-sync]').onclick = () => updateLk(true);
   $app.querySelector('[data-mprev]').onclick = () => goMonth(-1);
   $app.querySelector('[data-mnext]').onclick = () => goMonth(1);
   $app.querySelectorAll('[data-v]').forEach((b) => { b.onclick = () => { st.view = b.dataset.v; savePrefs(); renderNav(); renderContent(); }; });
@@ -613,11 +661,13 @@ export const attendance = {
       listening = true;
       document.addEventListener('keydown', onKey);
       window.addEventListener('resize', onResize);
+      window.addEventListener('attendance-sync', onAttendanceSync);
+      window.addEventListener('admin-logout', cancelHistory);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
       window.addEventListener('beforeunload', (e) => { if (st.pending.size) { flush(); e.preventDefault(); e.returnValue = ''; } });
     }
     boot();
   },
-  stop() { stopPoll(); flush(); },
+  stop() { stopPoll(); cancelHistory(); flush(); },
   dirty: () => st.pending.size > 0,
 };
