@@ -54,8 +54,8 @@ export const monthOfWeek = (monday) => ym(addDays(monday, 3));
 
 // ---------------- Студенты, пары, итоги ----------------
 
-/** Студенты, которые числятся хотя бы в один день из отрезка [from, to]. */
-export const activeStudents = (students, from, to) => (students || []).filter((s) => (!s.from || s.from <= to) && (!s.to || s.to >= from));
+/** Неудалённые студенты, которые числятся хотя бы в один день из отрезка [from, to]. */
+export const activeStudents = (students, from, to) => (students || []).filter((s) => !s.deleted && (!s.from || s.from <= to) && (!s.to || s.to >= from));
 
 export const markOf = (week, sid, iso, pair) => (week && week.m && week.m[sid] && week.m[sid][iso] && week.m[sid][iso][pair]) || null;
 
@@ -336,7 +336,7 @@ export function attendanceWorkbook({ kind, key, courseTitle, students, weeks, sc
   }
   // Весь курс
   const from = sortedWeeks[0], to = sortedWeeks.length ? addDays(sortedWeeks[sortedWeeks.length - 1], 5) : null;
-  const studs = from ? activeStudents(students, from, to) : students;
+  const studs = from ? activeStudents(students, from, to) : (students || []).filter(s => !s.deleted);
   const months = [...new Set(sortedWeeks.flatMap((m) => weekDays(m)).filter((d) => sortedWeeks.some((w) => weeks[w] && Object.values(weeks[w].m || {}).some((x) => x[d]))).map(ym))].sort();
   sheets.push(totalsSheet({ title, period: from ? `с ${dMonth(from)} ${from.slice(0, 4)} по ${dMonth(to)} ${to.slice(0, 4)}` : '(данных нет)', weeks, students: studs, exportedAt }));
   if (months.length) sheets.push(monthsSheet({ title, weeks, students: studs, months }));

@@ -593,7 +593,7 @@ function studentsPanel(box) {
   box.querySelectorAll('[data-back]').forEach((b) => { b.onclick = () => op({ action: 'restore', id: b.dataset.back }); });
   box.querySelectorAll('[data-delete-student]').forEach(button => { button.onclick = () => {
     const student = c.students.find(s => s.id === button.dataset.deleteStudent); if (!student) return;
-    showDeleteConfirmation({ container: box.querySelector('[data-student-delete-confirm]'), title: 'Удалить студента навсегда?', expected: student.name, label: 'Для подтверждения введите ФИО', description: 'ФИО исчезнет из списка. Прошлые отметки сохранятся как «Удалённый студент». Привязка к ЛК снимется после синхронизации; сам аккаунт останется. Восстановить имя нельзя.', onCancel: () => button.focus(), onDelete: async confirmName => {
+    showDeleteConfirmation({ container: box.querySelector('[data-student-delete-confirm]'), title: 'Удалить студента навсегда?', expected: student.name, label: 'Для подтверждения введите ФИО', description: 'Студент исчезнет из списка. Прошлые отметки сохранятся в данных. Привязка к ЛК снимется после синхронизации; сам аккаунт останется. Восстановить имя нельзя.', onCancel: () => button.focus(), onDelete: async confirmName => {
       await flush(); if (st.pending.size) throw new Error('Сначала сохраните отметки посещаемости и повторите удаление.');
       st.config = await api('students', { course: selectedCourse, action: 'delete', id: student.id, confirmName, to: todayIso() });
       let syncError = '';
