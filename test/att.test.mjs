@@ -64,3 +64,20 @@ test('выгрузка в Excel', async () => {
   assert.equal(petrov[2].s, 'mP');
   assert.equal(A.colName(0), 'A'); assert.equal(A.colName(25), 'Z'); assert.equal(A.colName(26), 'AA');
 });
+
+test('hidden pairs stay hidden despite saved marks and manual entries', () => {
+  const week = { m: { a: { '2026-11-02': { 2: 'P', 3: 'N' } } }, pairs: { '2026-11-02': [2, 4] }, hide: { '2026-11-02': [2, 3, 4] } };
+  assert.deepEqual(A.dayPairs(week, '2026-11-02', [1, 2, 3]), [1]);
+  assert.deepEqual(A.dayPairs(week, '2026-11-02', []), []);
+});
+
+test('removed pairs do not contribute residual marks to attendance totals', () => {
+  const result = A.studentTotals('a', { w: {
+    m: { a: { '2026-11-02': { 1: 'P', 2: 'N', 3: 'P' } } },
+    hide: { '2026-11-02': [2, 3] }, pairs: {},
+  } });
+  assert.equal(result.P, 1);
+  assert.equal(result.N, 0);
+  assert.equal(result.total, 1);
+  assert.equal(result.rate, 1);
+});
