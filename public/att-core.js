@@ -65,7 +65,7 @@ export function dayPairs(week, iso, schedule) {
   const set = new Set((schedule || []).filter((n) => !hidden.has(n)));
   for (const n of (week && week.pairs && week.pairs[iso]) || []) set.add(Number(n));
   for (const days of Object.values((week && week.m) || {})) for (const p of Object.keys(days[iso] || {})) set.add(Number(p));
-  return [...set].filter((n) => n > 0).sort((a, b) => a - b);
+  return [...set].filter((n) => n > 0 && !hidden.has(n)).sort((a, b) => a - b);
 }
 
 /** Итоги студента: {P, N, B, U, R, Z, absent, total, rate}. dayOk(iso) — какие дни считать. */
@@ -75,7 +75,8 @@ export function studentTotals(sid, weeks, dayOk = () => true) {
     const days = (w && w.m && w.m[sid]) || {};
     for (const [iso, pairs] of Object.entries(days)) {
       if (!dayOk(iso)) continue;
-      for (const v of Object.values(pairs)) if (v in t) t[v]++;
+      const hidden = new Set((w.hide?.[iso] || []).map(Number));
+      for (const [pair, v] of Object.entries(pairs)) if (!hidden.has(Number(pair)) && v in t) t[v]++;
     }
   }
   t.absent = ABSENT.reduce((a, k) => a + t[k], 0);

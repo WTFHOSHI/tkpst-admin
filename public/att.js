@@ -156,7 +156,7 @@ async function changePair(iso, n, add) {
     if (!sched.includes(n)) manual.add(n);
   } else {
     manual.delete(n);
-    if (sched.includes(n)) hidden.add(n);
+    hidden.add(n); // Удаление сохраняется и при временно недоступном расписании колледжа.
     for (const [sid, days] of Object.entries(w.m || {})) if (days[iso] && days[iso][n]) changes.push({ s: sid, d: iso, p: n, v: null });
     for (const k of [...st.pending.keys()]) if (k.endsWith(`|${iso}|${n}`) && k.startsWith(st.course + '|' + st.monday + '|')) st.pending.delete(k);
   }
