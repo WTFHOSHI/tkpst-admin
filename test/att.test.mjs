@@ -13,6 +13,13 @@ test('недели и месяцы', () => {
   assert.deepEqual(A.studyMonths(2026).slice(0, 2), ['2026-09', '2026-10']);
 });
 
+test('для новых отметок доступны только четыре нужных статуса', () => {
+  assert.deepEqual(A.MARKS.map((m) => m.code), ['P', 'N', 'B', 'Z']);
+  assert.equal(A.MARKS.find((m) => m.code === 'Z').title, 'По заявлению');
+  assert.equal(A.MARKS.some((m) => m.code === 'U' || m.code === 'R'), false);
+  assert.deepEqual(A.ALL_MARKS.map((m) => m.code), ['P', 'N', 'B', 'Z', 'U', 'R']);
+});
+
 test('пары дня и итоги', () => {
   const week = { m: { a: { '2026-09-29': { 2: 'N', 5: 'P' } } }, pairs: { '2026-09-29': [6] } };
   assert.deepEqual(A.dayPairs(week, '2026-09-29', [1, 2, 3]), [1, 2, 3, 5, 6]);
@@ -62,6 +69,7 @@ test('выгрузка в Excel', async () => {
   assert.equal(petrov[1].v, 'Петров Пётр');
   assert.deepEqual([petrov[2].v, petrov[3].v, petrov[4].v], ['✓', 'Н', '']);
   assert.equal(petrov[2].s, 'mP');
+  assert.ok(wk.rows[3].some((c) => c && c.v === 'Неуважительные\nпропуски'));
   assert.equal(A.colName(0), 'A'); assert.equal(A.colName(25), 'Z'); assert.equal(A.colName(26), 'AA');
 });
 
