@@ -1,7 +1,9 @@
 // Чистая логика посещаемости (без сети и без Node) — работает и в браузере, и в тестах.
 
-/** P — был, N — нет (прогул), B — болеет, U — уважительная, R — работа, Z — по заявлению. */
-export const CODES = ['P', 'N', 'B', 'U', 'R', 'Z'];
+/** Новые отметки доступны в админке; старые коды нужны для истории и импорта. */
+export const ACTIVE_CODES = ['P', 'N', 'B', 'Z'];
+export const LEGACY_CODES = ['U', 'R'];
+export const CODES = [...ACTIVE_CODES, ...LEGACY_CODES];
 export const COURSES = ['1', '2', '3'];
 export const ROLES = {
   admin: { title: 'Администратор', students: true, settings: true, import: true },
