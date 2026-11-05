@@ -1,16 +1,21 @@
 // Посещаемость: общие функции (даты, итоги, Excel). Работает и в браузере, и в Node (для тестов).
 // Ничего не знает про сеть — данные передаются параметрами.
 
-/** Отметки. P — был, N — нет, B — болеет, U — уважительная, R — работа, Z — по заявлению. */
+/** Новые отметки, доступные для заполнения в админке. */
 export const MARKS = [
   { code: 'P', label: '✓', title: 'Был на паре', short: 'был', fill: 'C6EFCE', color: '006100' },
-  { code: 'N', label: 'Н', title: 'Не был, неуважительная причина', short: 'неуваж.', fill: 'FFC7CE', color: '9C0006' },
+  { code: 'N', label: 'Н', title: 'Неуважительный пропуск', short: 'неуваж.', fill: 'FFC7CE', color: '9C0006' },
   { code: 'B', label: 'Б', title: 'Болеет', short: 'болеет', fill: 'FFEB9C', color: '7A4A00' },
-  { code: 'U', label: 'У', title: 'Уважительная причина', short: 'уваж.', fill: 'BDD7EE', color: '1F4E79' },
-  { code: 'R', label: 'Р', title: 'Работает', short: 'работа', fill: 'E4DFEC', color: '5B2C6F' },
   { code: 'Z', label: 'З', title: 'По заявлению', short: 'заявл.', fill: 'C9EDE8', color: '0B5E57' },
 ];
-export const MARK = Object.fromEntries(MARKS.map((m) => [m.code, m]));
+// Старые отметки оставляем для отображения и подсчёта уже заполненной истории.
+// Новые кнопки и клавиши для них не создаются.
+export const LEGACY_MARKS = [
+  { code: 'U', label: 'У', title: 'Старая отметка: уважительная причина', short: 'уваж.', fill: 'BDD7EE', color: '1F4E79' },
+  { code: 'R', label: 'Р', title: 'Старая отметка: работает', short: 'работа', fill: 'E4DFEC', color: '5B2C6F' },
+];
+export const ALL_MARKS = [...MARKS, ...LEGACY_MARKS];
+export const MARK = Object.fromEntries(ALL_MARKS.map((m) => [m.code, m]));
 export const ABSENT = ['N', 'B', 'U', 'R', 'Z'];
 
 // ---------------- Даты (строки YYYY-MM-DD, без часовых поясов) ----------------
@@ -125,24 +130,24 @@ export function zip(files) {
 
 // Стили ячеек. Индексы — позиции в cellXfs ниже.
 const S = { def: 0, title: 1, hdr: 2, name: 3, num: 4, empty: 11, totHdr: 12, tot: 13, sub: 14, bad: 15, text: 16, hdrL: 17, pct: 18, noday: 19, totB: 20 };
-MARKS.forEach((m, i) => { S['m' + m.code] = 5 + i; });
+ALL_MARKS.forEach((m, i) => { S['m' + m.code] = 5 + i; });
 
 function stylesXml() {
   const font = (x = '') => `<font>${x}<sz val="11"/><name val="Calibri"/><family val="2"/></font>`;
   const fonts = [font(), font('<b/>'), `<font><b/><sz val="14"/><name val="Calibri"/><family val="2"/></font>`,
-    ...MARKS.map((m) => font(`<b/><color rgb="FF${m.color}"/>`)), font('<i/><color rgb="FF666666"/>'), font('<b/><color rgb="FF9C0006"/>')];
+    ...ALL_MARKS.map((m) => font(`<b/><color rgb="FF${m.color}"/>`)), font('<i/><color rgb="FF666666"/>'), font('<b/><color rgb="FF9C0006"/>')];
   const fill = (rgb) => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
   const fills = ['<fill><patternFill patternType="none"/></fill>', '<fill><patternFill patternType="gray125"/></fill>', fill('E7ECE0'),
-    ...MARKS.map((m) => fill(m.fill)), fill('F2F5EC'), fill('EFEFEF')];
+    ...ALL_MARKS.map((m) => fill(m.fill)), fill('F2F5EC'), fill('EFEFEF')];
   const side = (n) => `<${n} style="thin"><color rgb="FFB7BCAE"/></${n}>`;
   const borders = ['<border><left/><right/><top/><bottom/><diagonal/></border>', `<border>${side('left')}${side('right')}${side('top')}${side('bottom')}<diagonal/></border>`];
   const C = '<alignment horizontal="center" vertical="center" wrapText="1"/>', Lft = '<alignment horizontal="left" vertical="center"/>';
   const xf = (font, fill, border, align = '', num = 0) => `<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${font ? ' applyFont="1"' : ''}${fill ? ' applyFill="1"' : ''}${border ? ' applyBorder="1"' : ''}${align ? ' applyAlignment="1"' : ''}${num ? ' applyNumberFormat="1"' : ''}>${align}</xf>`;
   const xfs = [
     xf(0, 0, 0), xf(2, 0, 0), xf(1, 2, 1, C), xf(0, 0, 1, Lft), xf(0, 0, 1, C),
-    ...MARKS.map((m, i) => xf(3 + i, 3 + i, 1, C)),
-    xf(0, 0, 1, C), xf(1, 3 + MARKS.length, 1, C), xf(0, 0, 1, C), xf(3 + MARKS.length, 0, 0), xf(4 + MARKS.length, 0, 1, C),
-    xf(0, 0, 0, Lft), xf(1, 2, 1, Lft), xf(0, 0, 1, C, 9), xf(3 + MARKS.length, 4 + MARKS.length, 1, C), xf(1, 3 + MARKS.length, 1, C),
+    ...ALL_MARKS.map((m, i) => xf(3 + i, 3 + i, 1, C)),
+    xf(0, 0, 1, C), xf(1, 3 + ALL_MARKS.length, 1, C), xf(0, 0, 1, C), xf(3 + ALL_MARKS.length, 0, 0), xf(4 + ALL_MARKS.length, 0, 1, C),
+    xf(0, 0, 0, Lft), xf(1, 2, 1, Lft), xf(0, 0, 1, C, 9), xf(3 + ALL_MARKS.length, 4 + ALL_MARKS.length, 1, C), xf(1, 3 + ALL_MARKS.length, 1, C),
   ];
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="${fonts.length}">${fonts.join('')}</fonts><fills count="${fills.length}">${fills.join('')}</fills><borders count="${borders.length}">${borders.join('')}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${xfs.length}">${xfs.join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
@@ -204,7 +209,10 @@ export function buildXlsx(sheets) {
 // ---------------- Листы посещаемости ----------------
 
 const TOT_COLS = [
-  ...MARKS.map((m) => ({ key: m.code, title: m.label + '\n' + m.short })),
+  ...MARKS.map((m) => ({
+    key: m.code,
+    title: m.code === 'P' ? 'Был' : m.code === 'N' ? 'Неуважительные\nпропуски' : m.code === 'B' ? 'Болеет' : 'По заявлению',
+  })),
   { key: 'absent', title: 'Всего\nпропусков' },
   { key: 'hours', title: 'Часов\nпропущ.' },
   { key: 'rate', title: 'Посещае-\nмость' },
@@ -219,9 +227,9 @@ const totCells = (t) => TOT_COLS.map((c) => {
 
 function legendRows(width) {
   const rows = [[], [{ v: 'Обозначения', s: 'title' }]];
-  for (const m of MARKS) rows.push([{ v: m.label, s: 'm' + m.code }, { v: m.title, s: 'text' }, ...Array(Math.max(0, width - 2)).fill(null)]);
+  for (const m of ALL_MARKS) rows.push([{ v: m.label, s: 'm' + m.code }, { v: m.title, s: 'text' }, ...Array(Math.max(0, width - 2)).fill(null)]);
   rows.push([{ v: '', s: 'empty' }, { v: 'Пусто — отметки нет', s: 'text' }]);
-  rows.push([null, { v: 'Пропуски = Н + Б + У + Р + З. Одна пара = 2 часа. Посещаемость = был ÷ (был + пропуски).', s: 'sub' }]);
+  rows.push([null, { v: 'Пропуски = Н + Б + З. Старые отметки У/Р учитываются в сохранённой истории. Одна пара = 2 часа. Посещаемость = был ÷ (был + пропуски).', s: 'sub' }]);
   return rows;
 }
 
