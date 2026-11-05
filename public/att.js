@@ -4,7 +4,7 @@ import { showDeleteConfirmation } from './delete-confirm.js?v=__V__';
 // ЛК получает отдельную защищённую копию отметок, только для привязанного студента.
 import { T, buildTimeline, setOverrides, parseLessons } from './js/core.js?v=__V__';
 import {
-  MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
+  MARKS, ALL_MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
   weeksOfMonth, monthOfWeek, activeStudents, dayPairs, studentTotals, attendanceWorkbook, buildXlsx, parseOldXlsx,
 } from './att-core.js?v=__V__';
 import { api as backend, loggedIn, logout, syncUsers, syncAttendanceHistory } from './backend.js?v=__V__';
@@ -30,6 +30,7 @@ const store = {
 const todayIso = () => T.iso(T.dayStart(T.now()));
 
 let $app = null;
+const ACTIVE_MARK_CODES = new Set(MARKS.map((m) => m.code));
 const st = {
   role: '', title: '',
   config: null, course: '2', month: '', monday: '', day: '', view: '', brush: 'N',
@@ -43,6 +44,7 @@ const st = {
 };
 let historyController = null;
 try { Object.assign(st, JSON.parse(store.get(PREF_KEY) || '{}')); } catch { /* ignore */ }
+if (!ACTIVE_MARK_CODES.has(st.brush)) st.brush = 'N';
 const savePrefs = () => store.set(PREF_KEY, JSON.stringify({ course: st.course, view: st.view, brush: st.brush }));
 const can = (what) => ({ students: ['admin', 'starosta', 'kurator'], settings: ['admin', 'starosta'], import: ['admin', 'starosta'], export: ['admin', 'starosta', 'kurator'] }[what] || []).includes(st.role);
 const course = () => st.config.courses[st.course];
@@ -411,7 +413,7 @@ function renderDayView(box, days, studs, sched) {
       </div>` : ''}
       <div class="att-day-foot">
         <button class="small-btn" data-pairsday>Добавить / убрать пару</button>
-        <span class="college">${Object.keys(absentToday).length ? 'Пропусков за день: ' + MARKS.filter((m) => absentToday[m.code]).map((m) => `${m.label} ${absentToday[m.code]}`).join(', ') : ''}</span>
+        <span class="college">${Object.keys(absentToday).length ? 'Пропусков за день: ' + ALL_MARKS.filter((m) => absentToday[m.code]).map((m) => `${m.label} ${absentToday[m.code]}`).join(', ') : ''}</span>
       </div>
     </div>`;
 
@@ -644,7 +646,7 @@ async function settingsPanel(box) {
 
 function onKey(e) {
   if (!$app || !$app.querySelector('[data-att]') || /input|textarea|select/i.test(e.target.tagName)) return;
-  const map = { 1: 'P', 2: 'N', 3: 'B', 4: 'U', 5: 'R', 6: 'Z', 0: '' };
+  const map = { 1: 'P', 2: 'N', 3: 'B', 4: 'Z', 0: '' };
   if (e.key in map) { st.brush = map[e.key]; savePrefs(); renderBrushes(); renderStatus(); }
 }
 let wasWide = null, listening = false;
