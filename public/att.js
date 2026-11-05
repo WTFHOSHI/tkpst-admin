@@ -38,8 +38,11 @@ const st = {
   pending: new Map(),   // 'course|monday|sid|iso|pair' → код | null
   inflight: false, saveErr: '', saveTimer: null, pollTimer: null,
   schedule: new Map(),  // 'gid|iso' → {pairs, titles} | {error}
+  scheduleRequests: new Map(), // тот же день не запрашиваем повторно, пока запрос выполняется
   overridesLoaded: false,
+  overridesPromise: null,
   lkBusy: false, lkText: '', lkError: false,
+  lkTimer: null,
   panel: '',            // '', 'students', 'export', 'settings'
 };
 let historyController = null;
@@ -67,25 +70,36 @@ async function scheduleDay(iso) {
   const gid = OWN_GROUP;
   const key = gid + '|' + iso;
   if (st.schedule.has(key)) return st.schedule.get(key);
-  try {
-    if (gid === OWN_GROUP && !st.overridesLoaded) {
-      try { const r = await api('overrides'); setOverrides(JSON.parse(r.text || '{}')); } catch { /* без изменений */ }
-      st.overridesLoaded = true;
+  if (st.scheduleRequests.has(key)) return st.scheduleRequests.get(key);
+  const request = (async () => {
+    try {
+      if (gid === OWN_GROUP && !st.overridesLoaded) {
+        if (!st.overridesPromise) {
+          st.overridesPromise = api('overrides')
+            .then((r) => { setOverrides(JSON.parse(r.text || '{}')); })
+            .catch(() => { /* без изменений */ })
+            .finally(() => { st.overridesLoaded = true; st.overridesPromise = null; });
+        }
+        await st.overridesPromise;
+      }
+      const r = await fetch(`${SCHED}/groups/${gid}/schedules?date=${iso}`, { cache: 'no-store' });
+      if (!r.ok) throw new Error('сервер расписания ответил ' + r.status);
+      const text = await r.text();
+      const lessons = parseLessons(text.trim() ? JSON.parse(text) : null);
+      const tl = buildTimeline(weekday(iso), lessons, gid === OWN_GROUP ? iso : null)
+        .filter((e) => e.type === 'pair' && !e.cancelled);
+      const v = { pairs: tl.map((e) => e.number), titles: Object.fromEntries(tl.map((e) => [e.number, e.lessons.map((l) => l.title).join(' / ') + (e.remote ? ' (дистант)' : '')])) };
+      st.schedule.set(key, v);
+      return v;
+    } catch (e) {
+      return { pairs: [], titles: {}, error: e.message };
     }
-    const r = await fetch(`${SCHED}/groups/${gid}/schedules?date=${iso}`, { cache: 'no-store' });
-    if (!r.ok) throw new Error('сервер расписания ответил ' + r.status);
-    const text = await r.text();
-    const lessons = parseLessons(text.trim() ? JSON.parse(text) : null);
-    const tl = buildTimeline(weekday(iso), lessons, gid === OWN_GROUP ? iso : null)
-      .filter((e) => e.type === 'pair' && !e.cancelled);
-    const v = { pairs: tl.map((e) => e.number), titles: Object.fromEntries(tl.map((e) => [e.number, e.lessons.map((l) => l.title).join(' / ') + (e.remote ? ' (дистант)' : '')])) };
-    st.schedule.set(key, v);
-    return v;
-  } catch (e) {
-    return { pairs: [], titles: {}, error: e.message };
-  }
+  })();
+  st.scheduleRequests.set(key, request);
+  const clearRequest = () => { if (st.scheduleRequests.get(key) === request) st.scheduleRequests.delete(key); };
+  request.then(clearRequest, clearRequest);
+  return request;
 }
-
 // ---------------- Отметки: локально сразу, на сервер — пачкой ----------------
 
 const pKey = (sid, iso, p, mon = st.monday, c = st.course) => `${c}|${mon}|${sid}|${iso}|${p}`;
@@ -174,6 +188,7 @@ async function loadWeek(silent = false) {
   try {
     const w = await api(`week?course=${st.course}&w=${st.monday}`);
     if (st.course + '|' + st.monday !== key) return;
+    if (silent && st.week && JSON.stringify(st.week) === JSON.stringify(w)) return;
     st.week = w; st.weekKey = key;
     renderContent();
     if (st.panel === 'pairs' && !silent) renderPanel();
@@ -189,7 +204,14 @@ function renderLkStatus() {
   if (button) { button.disabled = st.lkBusy; button.textContent = st.lkBusy ? 'Обновляю ЛК…' : 'Обновить ЛК'; }
 }
 
-function cancelHistory() { historyController?.abort(); historyController = null; st.lkBusy = false; }
+function cancelHistory() {
+  clearTimeout(st.lkTimer); st.lkTimer = null;
+  historyController?.abort(); historyController = null; st.lkBusy = false;
+}
+function scheduleLkSync(delay = 1200) {
+  clearTimeout(st.lkTimer);
+  st.lkTimer = setTimeout(() => { st.lkTimer = null; if (document.visibilityState !== 'hidden') updateLk(); }, delay);
+}
 async function updateLk(force = false) {
   cancelHistory();
   const controller = new AbortController(), selectedCourse = st.course;
@@ -243,7 +265,7 @@ async function boot() {
     shell();
     loadWeek();
     startPoll();
-    updateLk();
+    scheduleLkSync();
   } catch (e) {
     if (e.status === 401) return;
     $app.innerHTML = `<main class="admin"><div class="card warn">Не удалось загрузить: ${esc(e.message)}</div><button class="btn" data-retry>Ещё раз</button></main>`;
@@ -317,7 +339,7 @@ function shell() {
     if (st.pending.size && !confirm('Не все отметки сохранены. Выйти всё равно?')) return;
     logout(); st.pending.clear(); login();
   };
-  $app.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { st.course = b.dataset.c; savePrefs(); st.panel = st.panel === 'settings' ? st.panel : ''; renderNav(); renderPanel(); loadWeek(); updateLk(); }; });
+  $app.querySelectorAll('[data-c]').forEach((b) => { b.onclick = () => { st.course = b.dataset.c; savePrefs(); st.panel = st.panel === 'settings' ? st.panel : ''; renderNav(); renderPanel(); loadWeek(); scheduleLkSync(); }; });
   $app.querySelector('[data-lk-sync]').onclick = () => updateLk(true);
   $app.querySelector('[data-mprev]').onclick = () => goMonth(-1);
   $app.querySelector('[data-mnext]').onclick = () => goMonth(1);
