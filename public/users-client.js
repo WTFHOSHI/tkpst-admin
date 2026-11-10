@@ -1,5 +1,4 @@
-import { fetchJsonWithTimeout } from './network.js?v=__V__';
-const API = 'https://tkpst-api.onrender.com/api/admin/';
+import { postApi } from './network.js?v=__V__';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function createUsersClient(fetchImpl = fetch) {
@@ -10,7 +9,7 @@ export function createUsersClient(fetchImpl = fetch) {
     const version = revision;
     let response, data;
     try {
-      ({ response, data } = await fetchJsonWithTimeout(fetchImpl, API + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'error', signal }, 65000));
+      ({ response, data } = await postApi(fetchImpl, path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'error', signal }));
     } catch (error) {
       if (error.name === 'AbortError') throw error;
       throw new Error('Нет связи с сервисом ЛК. Проверьте интернет и повторите.');

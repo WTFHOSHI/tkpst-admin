@@ -10,7 +10,7 @@ test('attendance writer uses fixed routes, no cookies and only explicit role/pas
   await client.login('Test role password','kurator');
   assert.equal(client.credentials().token,token);
   await client.request('start',{course:'2',monday:'2026-10-26'});
-  assert.equal(calls[0].url,'https://tkpst-api.onrender.com/api/admin/attendance/login');
+  assert.equal(calls[0].url,'https://tkpst-account.telling-math.workers.dev/api/admin/attendance/login');
   assert.deepEqual(JSON.parse(calls[0].options.body),{password:'Test role password',role:'kurator'});
   assert.equal(calls[1].options.headers.Authorization,'Bearer '+token);
   assert.equal(calls[1].options.credentials,'omit');assert.equal(calls[1].options.cache,'no-store');

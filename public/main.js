@@ -23,8 +23,11 @@ const want = () => tabNames.includes(location.hash.slice(1)) ? location.hash.sli
 const paletteOptions = [
   ['forest', 'Зелёная', '#4F6F2F'], ['ocean', 'Синяя', '#285A91'],
   ['violet', 'Лиловая', '#6A4EA3'], ['sand', 'Тёплая', '#8B5319'],
+  ['rose', 'Розовая', '#A8455F'], ['teal', 'Бирюзовая', '#1F6F6B'],
   ['mono', 'Чёрно-белая', 'linear-gradient(90deg, #161616 50%, #fff 50%)'],
 ];
+// Стили те же, что в приложении: меняют форму, шрифт и поверхности.
+const styleOptions = [['calm', 'Спокойный'], ['quiet', 'Тихий'], ['native', 'Системный'], ['glass', 'Стекло'], ['soft', 'Мягкий'], ['terminal', 'Терминал']];
 const colorRoles = ["primary","on-primary","primary-c","on-primary-c","secondary-c","on-secondary-c","secondary","tertiary","tertiary-c","on-tertiary-c","bg","card","card-high","text","muted","outline"];
 const paletteColors = {
   "ocean": [
@@ -39,6 +42,14 @@ const paletteColors = {
     "#8B5319 #fff #F8DEC0 #382005 #F4EADB #34271B #706253 #59672B #E8EECF #27310D #FBF8F2 #F4EEE4 #EBE2D4 #29231C #63594F #D2C4B3",
     "#F2BB7A #422600 #6C451F #FFE3BE #463729 #F2E6D5 #D0BEA7 #BACB80 #454F25 #EAF3BC #191510 #242019 #332A20 #F2E9DC #C8BAA8 #594B3D"
   ],
+  "rose": [
+    "#A8455F #fff #FBDDE4 #3F0F1D #F6E6EA #33201F #75575D #7A5A2A #F6E7CB #332306 #FCF7F8 #F6EEF0 #EDE1E4 #2A1C1F #6A565B #D9C5CA",
+    "#F4B3C2 #56162A #6E2C40 #FFD9E1 #4A353A #F6E3E7 #D3BBC1 #E6C690 #5A4421 #FBE8C5 #191214 #241A1D #33262A #F4E8EB #CDB8BD #57444A"
+  ],
+  "teal": [
+    "#1F6F6B #fff #CDEDE9 #06302D #DFEEEC #152524 #536765 #86562A #F8E2CC #331A04 #F4F9F8 #EAF3F2 #DDE9E8 #16211F #51625F #B9CCC9",
+    "#8FD6CF #053B37 #1F504C #C8F0EB #2E4341 #DAEEEB #B4CBC8 #F0BC8A #64401C #FCE2C8 #0F1716 #18221F #24322F #E4F0EE #B5C8C5 #40524F"
+  ],
   "mono": [
     "#303030 #fff #E2E2E2 #161616 #ECECEC #222 #555 #424242 #DEDEDE #202020 #fff #F4F4F4 #EAEAEA #161616 #555 #C6C6C6",
     "#E8E8E8 #171717 #383838 #F2F2F2 #303030 #E9E9E9 #C6C6C6 #D2D2D2 #424242 #F4F4F4 #111 #1C1C1C #2A2A2A #F3F3F3 #BDBDBD #4B4B4B"
@@ -51,10 +62,13 @@ const readPreference = (key, fallback) => {
 };
 let themeMode = readPreference('theme', 'system');
 let palette = readPreference('palette', 'forest');
+let lookStyle = readPreference('style', 'calm');
 const themeDialog = document.createElement('dialog');
 themeDialog.className = 'admin-theme-dialog';
 themeDialog.setAttribute('aria-labelledby', 'admin-theme-title');
 themeDialog.innerHTML = '<div class="theme-dialog-header"><h2 id="admin-theme-title">Оформление</h2><button type="button" class="icon" data-close-theme aria-label="Закрыть настройки темы">✕</button></div>' +
+  '<h3>Стиль</h3><div class="theme-grid" role="radiogroup" aria-label="Стиль оформления">' +
+  styleOptions.map(([value, label]) => '<label class="theme-choice"><input type="radio" name="admin-style" value="' + value + '"><span>' + label + '</span></label>').join('') + '</div>' +
   '<h3>Цветовая тема</h3><div class="theme-grid" role="radiogroup" aria-label="Цветовая тема">' +
   paletteOptions.map(([value, label, swatch]) => '<label class="theme-choice"><input type="radio" name="admin-palette" value="' + value + '"><span class="theme-swatch" style="--swatch:' + swatch + '" aria-hidden="true"></span><span>' + label + '</span></label>').join('') +
   '</div><h3>Режим</h3><div role="radiogroup" aria-label="Режим оформления">' +
@@ -66,10 +80,12 @@ document.body.append(themeDialog);
 function renderTheme() {
   if (!['system', 'light', 'dark'].includes(themeMode)) themeMode = 'system';
   if (!paletteOptions.some(([key]) => key === palette)) palette = 'forest';
+  if (!styleOptions.some(([key]) => key === lookStyle)) lookStyle = 'calm';
   const dark = themeMode === 'dark' || (themeMode === 'system' && systemTheme.matches);
   const root = document.documentElement;
   root.dataset.theme = themeMode;
   root.dataset.palette = palette;
+  root.dataset.style = lookStyle;
   root.dataset.appearance = dark ? 'dark' : 'light';
   const colors = paletteColors[palette]?.[dark ? 1 : 0].split(' ');
   colorRoles.forEach((role, i) => {
@@ -80,7 +96,7 @@ function renderTheme() {
   const meta = document.querySelector('meta[name=theme-color]');
   if (meta) meta.content = getComputedStyle(root).getPropertyValue('--bg').trim();
   themeDialog.querySelectorAll('input').forEach(input => {
-    input.checked = input.value === (input.name === 'admin-theme' ? themeMode : palette);
+    input.checked = input.value === (input.name === 'admin-theme' ? themeMode : input.name === 'admin-style' ? lookStyle : palette);
   });
   themeButton.setAttribute('aria-label', 'Настроить тему');
   themeButton.title = 'Оформление: ' + paletteOptions.find(([key]) => key === palette)[1];
@@ -97,17 +113,18 @@ themeDialog.addEventListener('click', event => {
 });
 themeDialog.addEventListener('change', event => {
   const input = event.target;
-  if (input.name !== 'admin-theme' && input.name !== 'admin-palette') return;
-  const key = input.name === 'admin-theme' ? 'theme' : 'palette';
-  if (key === 'theme') themeMode = input.value; else palette = input.value;
+  if (!['admin-theme', 'admin-palette', 'admin-style'].includes(input.name)) return;
+  const key = input.name.slice('admin-'.length);
+  if (key === 'theme') themeMode = input.value; else if (key === 'style') lookStyle = input.value; else palette = input.value;
   try { localStorage.setItem(key, JSON.stringify(input.value)); } catch { /* приватный режим */ }
   renderTheme();
 });
 systemTheme.addEventListener('change', renderTheme);
 window.addEventListener('storage', event => {
-  if (event.key !== null && event.key !== 'theme' && event.key !== 'palette') return;
+  if (event.key !== null && !['theme', 'palette', 'style'].includes(event.key)) return;
   themeMode = readPreference('theme', 'system');
   palette = readPreference('palette', 'forest');
+  lookStyle = readPreference('style', 'calm');
   renderTheme();
 });
 renderTheme();

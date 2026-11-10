@@ -1,5 +1,4 @@
-import { fetchJsonWithTimeout } from './network.js?v=__V__';
-const API = 'https://tkpst-api.onrender.com/api/admin/attendance/';
+import { postApi } from './network.js?v=__V__';
 
 export function createAttendanceClient(fetchImpl = fetch) {
   let saved = null, revision = 0;
@@ -11,10 +10,10 @@ export function createAttendanceClient(fetchImpl = fetch) {
     const version = revision, auth = credentials();
     let response, data;
     try {
-      ({ response, data } = await fetchJsonWithTimeout(fetchImpl, API + path, {
+      ({ response, data } = await postApi(fetchImpl, 'attendance/' + path, {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...(auth ? { Authorization: 'Bearer ' + auth.token } : {}) },
         body: JSON.stringify(body), credentials: 'omit', cache: 'no-store', redirect: 'error', signal,
-      }, 65000));
+      }));
     } catch (error) {
       if (error.name === 'AbortError') throw error;
       throw new Error('Не удалось обновить посещаемость в ЛК. Отметки в админке сохранены.');

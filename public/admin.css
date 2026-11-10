@@ -375,3 +375,47 @@ body[data-auth="signed-out"] :is(.admin-tabs, .panel-session, .panel-brand div >
   .att-nav { padding: 8px 10px; }
   .att-toolbar .small-btn { flex-grow: 1; justify-content: center; }
 }
+
+/* ===== Оформление v2: единая ширина разделов, панель посещаемости, стили ===== */
+/* Все разделы стоят в одной колонке 1240px; формы расписания не растягиваются шире 900px. */
+.admin:not(.att):not(.users-main):not(.panel-login) { max-width: 1240px; }
+.admin:not(.att):not(.users-main):not(.panel-login) > * { width: 100%; max-width: 900px; }
+@media (min-width: 900px) { #app:has(> .admin:not(.att):not(.users-main):not(.panel-login)) > .bar { max-width: 1240px; } }
+/* На телефоне действия посещаемости идут одной прокручиваемой строкой, а не двумя тесными рядами. */
+@media (max-width: 620px) {
+  .att-toolbar { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -16px; padding-inline: 16px; scroll-snap-type: x proximity; }
+  .att-toolbar::-webkit-scrollbar { display: none; }
+  .att-toolbar > * { flex: none; scroll-snap-align: start; }
+  .att-toolbar .small-btn { min-height: 44px; padding: 8px 12px; white-space: nowrap; }
+}
+.admin-theme-dialog .theme-choice { min-height: 48px; }
+
+:root[data-style="quiet"] :is(.card, .att-nav, .user-row, .users-source, .users-list) { background: transparent; border: 1px solid var(--outline); box-shadow: none; }
+:root[data-style="quiet"] :is(.card, .btn, .small-btn, .chip, .seg, .seg button, .admin-tabs a, .att-nav, .field, input, select, textarea, .icon) { border-radius: 8px; }
+:root[data-style="quiet"] .admin-tabs a.on { background: transparent; color: var(--primary); box-shadow: inset 0 -2px 0 var(--primary); border-radius: 0; }
+:root[data-style="quiet"] #app > .bar .t::after { content: "."; color: var(--primary); }
+
+:root[data-style="native"] :is(.card, .att-nav) { border-radius: 14px; }
+:root[data-style="native"] :is(.btn, .small-btn, .chip, .admin-tabs a, input, select, textarea) { border-radius: 10px; }
+
+:root[data-style="glass"] body {
+  background: radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--primary) 38%, var(--bg)) 0%, transparent 60%),
+    radial-gradient(110% 70% at 100% 100%, color-mix(in srgb, var(--tertiary) 32%, var(--bg)) 0%, transparent 62%), var(--bg);
+  background-attachment: fixed; min-height: 100dvh;
+}
+:root[data-style="glass"] :is(.card, .att-nav, .admin-tabs, .savebar) { background: color-mix(in srgb, var(--card) 60%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3); }
+:root[data-style="glass"] :is(.card, .att-nav) { border: 1px solid color-mix(in srgb, #fff 30%, transparent); border-radius: 22px; }
+:root[data-style="glass"][data-appearance="dark"] :is(.card, .att-nav) { border-color: color-mix(in srgb, #fff 12%, transparent); }
+:root[data-style="glass"] :is(.btn:not(.outline), .admin-tabs a.on) { background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 62%, var(--tertiary))); color: var(--on-primary); }
+
+:root[data-style="soft"] :is(.card, .att-nav) { border-radius: 26px; border-color: transparent; box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 9%, transparent), 0 1px 2px color-mix(in srgb, var(--text) 8%, transparent); }
+:root[data-style="soft"][data-appearance="dark"] :is(.card, .att-nav) { box-shadow: 0 10px 26px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.05); }
+:root[data-style="soft"] :is(.btn, .small-btn, .chip, .admin-tabs a, input, select, textarea) { border-radius: 16px; }
+:root[data-style="soft"] .btn:not(.outline) { box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 34%, transparent); }
+
+:root[data-style="terminal"] body, :root[data-style="terminal"] :is(button, input, select, textarea) { font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace; }
+:root[data-style="terminal"] *:not(.theme-swatch):not(.spinner) { border-radius: 0 !important; }
+:root[data-style="terminal"] :is(.card, .att-nav) { background: transparent; border: 1px solid var(--outline); box-shadow: none; }
+:root[data-style="terminal"] .admin-tabs a.on { background: var(--text); color: var(--bg); }
+:root[data-style="terminal"] #app > .bar .t { text-transform: lowercase; }
+:root[data-style="terminal"] #app > .bar .t::before { content: "> "; color: var(--primary); }
