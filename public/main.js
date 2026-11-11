@@ -34,7 +34,7 @@ const paletteOptions = [
   ['amber', 'Янтарная', '#725200'],
   ['graphite', 'Графит', '#4F5964'],
   ['mono', 'Чёрно-белая', 'linear-gradient(90deg, #161616 50%, #fff 50%)'],
-  ['black', 'Бело-чёрная', 'linear-gradient(90deg, #fff 50%, #000 50%)'],
+  ['white', 'Бело-чёрная', 'linear-gradient(90deg, #fff 50%, #000 50%)'],
 ];
 // Стили те же, что в приложении: меняют форму, шрифт и поверхности.
 const styleOptions = [['calm', 'Спокойный'], ['quiet', 'Тихий'], ['native', 'Системный'], ['glass', 'Стекло'], ['soft', 'Мягкий'], ['terminal', 'Терминал'], ['paper', 'Бумага'], ['band', 'Цветной'], ['outline', 'Контур']];
@@ -92,9 +92,9 @@ const paletteColors = {
     "#303030 #fff #E2E2E2 #161616 #ECECEC #222 #555 #424242 #DEDEDE #202020 #fff #F4F4F4 #EAEAEA #161616 #555 #C6C6C6",
     "#E8E8E8 #171717 #383838 #F2F2F2 #303030 #E9E9E9 #C6C6C6 #D2D2D2 #424242 #F4F4F4 #111 #1C1C1C #2A2A2A #F3F3F3 #BDBDBD #4B4B4B"
   ],
-  "black": [
-    "#F2F2F2 #000000 #262626 #F5F5F5 #1C1C1C #EDEDED #BEBEBE #D6D6D6 #2E2E2E #F5F5F5 #000000 #0E0E0E #1A1A1A #F5F5F5 #B4B4B4 #3A3A3A",
-    "#F2F2F2 #000000 #262626 #F5F5F5 #1C1C1C #EDEDED #BEBEBE #D6D6D6 #2E2E2E #F5F5F5 #000000 #0E0E0E #1A1A1A #F5F5F5 #B4B4B4 #3A3A3A"
+  "white": [
+    "#000000 #FFFFFF #E6E6E6 #000000 #F0F0F0 #111111 #4A4A4A #1F1F1F #E0E0E0 #111111 #FFFFFF #F5F5F5 #EBEBEB #000000 #4D4D4D #BDBDBD",
+    "#000000 #FFFFFF #E6E6E6 #000000 #F0F0F0 #111111 #4A4A4A #1F1F1F #E0E0E0 #111111 #FFFFFF #F5F5F5 #EBEBEB #000000 #4D4D4D #BDBDBD"
   ]
 };
 const themeButton = document.querySelector('[data-admin-theme]');
@@ -123,8 +123,8 @@ function renderTheme() {
   if (!['system', 'light', 'dark'].includes(themeMode)) themeMode = 'system';
   if (!paletteOptions.some(([key]) => key === palette)) palette = 'forest';
   if (!styleOptions.some(([key]) => key === lookStyle)) lookStyle = 'calm';
-  // Чёрная тема тёмная всегда.
-  const dark = palette === 'black' || themeMode === 'dark' || (themeMode === 'system' && systemTheme.matches);
+  // «Бело-чёрная» тема светлая всегда.
+  const dark = palette !== 'white' && (themeMode === 'dark' || (themeMode === 'system' && systemTheme.matches));
   const root = document.documentElement;
   root.dataset.theme = themeMode;
   root.dataset.palette = palette;
