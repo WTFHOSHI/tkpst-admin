@@ -21,7 +21,7 @@ let attendanceFail = false, attendanceStartHook = null;
 let attendanceTicket = 0;
 const reply = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body, headers: new Map() });
 globalThis.fetch = async (url, init = {}) => {
-  if (String(url).startsWith('https://tkpst-api.onrender.com/api/admin/attendance/')) {
+  if (String(url).startsWith('https://tkpst-account.telling-math.workers.dev/api/admin/attendance/')) {
     if (cloudBlocked) return new Promise(() => {});
     const path = String(url).split('/').at(-1), body = JSON.parse(init.body || '{}');
     attendanceCalls.push({ path, body, auth: init.headers.Authorization }); attendanceOrder.push(path);
@@ -31,7 +31,7 @@ globalThis.fetch = async (url, init = {}) => {
     if (path === 'sync' && attendanceFail) return reply(503, { error: 'Synthetic sync failure' });
     return reply(200, { ok: true, syncedAt: Date.now() });
   }
-  if (String(url).startsWith('https://tkpst-api.onrender.com/api/admin/')) {
+  if (String(url).startsWith('https://tkpst-account.telling-math.workers.dev/api/admin/')) {
     if (cloudBlocked) return new Promise(() => {});
     if (deferCloud && url.endsWith('/login')) return new Promise(resolve => { releaseCloud = resolve; });
     if (url.endsWith('/login')) { cloudLogins++; return reply(200, { token: cloudToken, expiresAt: Date.now() + 864e5 }); }

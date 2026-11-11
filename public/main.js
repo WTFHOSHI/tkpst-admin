@@ -21,23 +21,71 @@ const want = () => tabNames.includes(location.hash.slice(1)) ? location.hash.sli
 
 // Те же палитры и режимы, что в обычном приложении.
 const paletteOptions = [
-  ['forest', 'Зелёная', '#4F6F2F'], ['ocean', 'Синяя', '#285A91'],
-  ['violet', 'Лиловая', '#6A4EA3'], ['sand', 'Тёплая', '#8B5319'],
+  ['forest', 'Зелёная', '#446327'],
+  ['mint', 'Мятная', '#206749'],
+  ['teal', 'Бирюзовая', '#0D6565'],
+  ['sky', 'Небесная', '#055F86'],
+  ['ocean', 'Синяя', '#285994'],
+  ['indigo', 'Индиго', '#4A4E99'],
+  ['violet', 'Лиловая', '#674689'],
+  ['rose', 'Розовая', '#853C58'],
+  ['crimson', 'Красная', '#933331'],
+  ['sand', 'Тёплая', '#784C2D'],
+  ['amber', 'Янтарная', '#725200'],
+  ['graphite', 'Графит', '#4F5964'],
   ['mono', 'Чёрно-белая', 'linear-gradient(90deg, #161616 50%, #fff 50%)'],
 ];
+// Стили те же, что в приложении: меняют форму, шрифт и поверхности.
+const styleOptions = [['calm', 'Спокойный'], ['quiet', 'Тихий'], ['native', 'Системный'], ['glass', 'Стекло'], ['soft', 'Мягкий'], ['terminal', 'Терминал'], ['paper', 'Бумага'], ['band', 'Цветной'], ['outline', 'Контур']];
 const colorRoles = ["primary","on-primary","primary-c","on-primary-c","secondary-c","on-secondary-c","secondary","tertiary","tertiary-c","on-tertiary-c","bg","card","card-high","text","muted","outline"];
 const paletteColors = {
+  "forest": [
+    "#446327 #FFFFFF #DDECD1 #1C2C0C #E7EEE3 #1E241A #555F4D #6D5829 #F3E5C9 #342707 #F9FBF7 #EEF2EB #E2E8DE #171C14 #575D52 #C9D1C3",
+    "#AEC89A #17240B #334326 #DCEAD2 #2D3328 #E1E7DD #B1BBA9 #D0BB92 #483B20 #EFE3CB #0F110E #191C16 #252922 #E5E9E3 #ADB4A8 #464D42"
+  ],
+  "mint": [
+    "#206749 #FFFFFF #D2EEDF #092E1F #E2EFE8 #19251F #4C6056 #72552B #F6E3C9 #372508 #F7FBF9 #EBF3EE #DEE9E3 #131D18 #515E57 #C3D2CA",
+    "#9BCBB2 #082519 #254536 #D3ECDE #27342D #DDE8E2 #A8BDB2 #D5B993 #4B3A21 #F3E2CB #0D120F #161C19 #212A25 #E2EAE6 #A8B5AE #414E47"
+  ],
+  "teal": [
+    "#0D6565 #FFFFFF #CFEDED #012D2D #E0EFEE #162525 #476060 #785130 #FBE1CC #3B220D #F6FBFB #E9F3F3 #DBEAE9 #101D1D #4E5F5E #C0D2D2",
+    "#95C9C8 #042525 #204444 #D0EBEA #243433 #DBE8E7 #A4BDBD #DBB597 #4F3724 #F7E0CE #0D1212 #151C1C #1F2A2A #E1EAEA #A5B5B4 #3E4E4E"
+  ],
+  "sky": [
+    "#055F86 #FFFFFF #CCEBFF #012A3E #E1EDF5 #18232A #4B5E69 #795033 #FCE0CE #3C220F #F7FBFD #EAF2F7 #DDE8EF #121C22 #505D65 #C2D0D9",
+    "#90C6E6 #012333 #1C4256 #CDE9FB #273239 #DCE6ED #A7BBC7 #DDB499 #503726 #F8DFCF #0D1114 #161C1F #21292E #E2E9EE #A7B3BB #404C54"
+  ],
   "ocean": [
-    "#285A91 #fff #D9EAFE #0C2A49 #E3ECF7 #172638 #586A7D #7D5D21 #F6E9CC #332405 #F5F8FC #EDF3FA #E1EAF4 #18212D #526173 #BBC8D8",
-    "#9BC7F2 #0B3155 #294767 #D5EAFE #314152 #DCE9F6 #B8CADB #E9C98E #5B4523 #FBE9C7 #111820 #1A2430 #263342 #E7EFF7 #BBCBDA #435365"
+    "#285994 #FFFFFF #D7E8FD #0D2746 #E4ECF6 #1B222B #505C6C #74542C #F8E2CA #382409 #F8FAFD #ECF1F8 #E0E7F0 #151B23 #535C66 #C5CFDB",
+    "#9CC1F1 #0B2039 #263E5C #D4E6FE #2A313A #DEE5EE #ACB9CA #D7B894 #4C3922 #F4E1CC #0E1114 #171B20 #23282F #E3E8EF #AAB2BD #434B55"
+  ],
+  "indigo": [
+    "#4A4E99 #FFFFFF #E0E5FE #1F2149 #E8EAF6 #1F212B #57596C #754B67 #FADCEF #391F31 #F9FAFE #EFF0F8 #E3E5F0 #181A23 #585A66 #CACDDB",
+    "#B0B9F5 #191B3B #35395F #DEE3FE #2E2F3B #E2E4EE #B3B6CA #D9AFCA #4D3445 #F6DCEC #101014 #191A20 #26272F #E6E7EF #AEB0BD #484A55"
   ],
   "violet": [
-    "#6A4EA3 #fff #E9E0FB #2A1A4A #EFE9F6 #2D2538 #6A6074 #91573E #F7E4D9 #4B2719 #FAF8FC #F4EFF8 #EAE3F1 #251D2E #61576D #CCC0D7",
-    "#D1B7F7 #31204C #51366F #F0DBFF #42354E #EFE6F5 #C6B8D1 #E9B39C #633A31 #FFE1D1 #17131C #211B28 #302737 #F0EAF4 #C5B9CC #52475B"
+    "#674689 #FFFFFF #EDE0FE #2E1D40 #EDE9F4 #241F29 #5F5769 #7E4B47 #FEDEDA #3E1E1C #FBF9FD #F2EFF7 #E8E4EE #1C1921 #5D5864 #D1CBD9",
+    "#C9B1E7 #251834 #443557 #EBDEFC #332E39 #E7E2EC #BBB3C6 #E2AFAA #523431 #FBDCD9 #111013 #1C191F #29262E #E9E6ED #B4AEBB #4D4853"
+  ],
+  "rose": [
+    "#853C58 #FFFFFF #FEDCE6 #3E1726 #F5E7EB #2A1E22 #69545B #72552B #F6E3C9 #372508 #FDF9FA #F8EEF1 #EFE2E6 #22171A #65565B #DAC9CE",
+    "#E7AABD #32131F #55303D #FCDAE4 #392C30 #EDE1E4 #C7B0B7 #D5B993 #4B3A21 #F3E2CB #140F10 #1F191A #2E2528 #EEE5E8 #BBADB1 #54464A"
+  ],
+  "crimson": [
+    "#933331 #FFFFFF #FDDEDB #451312 #F6E7E6 #2B1E1D #6B5552 #6D5829 #F3E5C9 #342707 #FDF9F8 #F8EEED #F0E3E1 #221716 #665755 #DBC9C7",
+    "#F4A69F #38100F #5D2D2A #FDDCD8 #3A2D2B #EEE1E0 #C9B1AE #D0BB92 #483B20 #EFE3CB #140F0F #1F1918 #2F2524 #EEE5E4 #BCADAB #554645"
   ],
   "sand": [
-    "#8B5319 #fff #F8DEC0 #382005 #F4EADB #34271B #706253 #59672B #E8EECF #27310D #FBF8F2 #F4EEE4 #EBE2D4 #29231C #63594F #D2C4B3",
-    "#F2BB7A #422600 #6C451F #FFE3BE #463729 #F2E6D5 #D0BEA7 #BACB80 #454F25 #EAF3BC #191510 #242019 #332A20 #F2E9DC #C8BAA8 #594B3D"
+    "#784C2D #FFFFFF #F8E1D3 #372010 #F6E8DF #2B1F17 #6B5648 #45653E #D9EDD4 #1B2F17 #FDF9F6 #F8EFE9 #F0E3DB #231811 #66584E #DBCABF",
+    "#DAB59D #2D1A0D #4E3728 #F4E0D3 #3A2D25 #EEE2DA #C9B2A3 #AAC8A3 #30432C #D9EBD5 #140F0D #201915 #2F251F #EFE6E0 #BDAEA4 #55473E"
+  ],
+  "amber": [
+    "#725200 #FFFFFF #F4E4C9 #342300 #F2EADD #272114 #655944 #3D6646 #D4EED8 #15301B #FCFAF6 #F5F0E7 #ECE5D9 #201A0F #625A4C #D6CDBD",
+    "#D4BA8B #2A1D01 #4B3A1B #F1E3CA #362F22 #EAE4D8 #C2B6A0 #A3C9AA #2C4431 #D5ECD9 #13100C #1E1A14 #2C271E #ECE7DF #B8B0A2 #51493C"
+  ],
+  "graphite": [
+    "#4F5964 #FFFFFF #E2E7EC #22272D #E7ECF0 #1E2226 #555C63 #74542C #F8E2CA #382409 #F9FAFC #EEF1F4 #E3E7EB #171B1F #575B60 #C9CED4",
+    "#B6BFC8 #1B2024 #383E43 #E0E5EA #2D3135 #E1E5E9 #B1B8C0 #D7B894 #4C3922 #F4E1CC #0F1112 #191B1D #25282B #E5E8EB #ADB2B7 #464B50"
   ],
   "mono": [
     "#303030 #fff #E2E2E2 #161616 #ECECEC #222 #555 #424242 #DEDEDE #202020 #fff #F4F4F4 #EAEAEA #161616 #555 #C6C6C6",
@@ -51,10 +99,13 @@ const readPreference = (key, fallback) => {
 };
 let themeMode = readPreference('theme', 'system');
 let palette = readPreference('palette', 'forest');
+let lookStyle = readPreference('style', 'calm');
 const themeDialog = document.createElement('dialog');
 themeDialog.className = 'admin-theme-dialog';
 themeDialog.setAttribute('aria-labelledby', 'admin-theme-title');
 themeDialog.innerHTML = '<div class="theme-dialog-header"><h2 id="admin-theme-title">Оформление</h2><button type="button" class="icon" data-close-theme aria-label="Закрыть настройки темы">✕</button></div>' +
+  '<h3>Стиль</h3><div class="theme-grid" role="radiogroup" aria-label="Стиль оформления">' +
+  styleOptions.map(([value, label]) => '<label class="theme-choice"><input type="radio" name="admin-style" value="' + value + '"><span>' + label + '</span></label>').join('') + '</div>' +
   '<h3>Цветовая тема</h3><div class="theme-grid" role="radiogroup" aria-label="Цветовая тема">' +
   paletteOptions.map(([value, label, swatch]) => '<label class="theme-choice"><input type="radio" name="admin-palette" value="' + value + '"><span class="theme-swatch" style="--swatch:' + swatch + '" aria-hidden="true"></span><span>' + label + '</span></label>').join('') +
   '</div><h3>Режим</h3><div role="radiogroup" aria-label="Режим оформления">' +
@@ -66,10 +117,12 @@ document.body.append(themeDialog);
 function renderTheme() {
   if (!['system', 'light', 'dark'].includes(themeMode)) themeMode = 'system';
   if (!paletteOptions.some(([key]) => key === palette)) palette = 'forest';
+  if (!styleOptions.some(([key]) => key === lookStyle)) lookStyle = 'calm';
   const dark = themeMode === 'dark' || (themeMode === 'system' && systemTheme.matches);
   const root = document.documentElement;
   root.dataset.theme = themeMode;
   root.dataset.palette = palette;
+  root.dataset.style = lookStyle;
   root.dataset.appearance = dark ? 'dark' : 'light';
   const colors = paletteColors[palette]?.[dark ? 1 : 0].split(' ');
   colorRoles.forEach((role, i) => {
@@ -80,7 +133,7 @@ function renderTheme() {
   const meta = document.querySelector('meta[name=theme-color]');
   if (meta) meta.content = getComputedStyle(root).getPropertyValue('--bg').trim();
   themeDialog.querySelectorAll('input').forEach(input => {
-    input.checked = input.value === (input.name === 'admin-theme' ? themeMode : palette);
+    input.checked = input.value === (input.name === 'admin-theme' ? themeMode : input.name === 'admin-style' ? lookStyle : palette);
   });
   themeButton.setAttribute('aria-label', 'Настроить тему');
   themeButton.title = 'Оформление: ' + paletteOptions.find(([key]) => key === palette)[1];
@@ -97,17 +150,18 @@ themeDialog.addEventListener('click', event => {
 });
 themeDialog.addEventListener('change', event => {
   const input = event.target;
-  if (input.name !== 'admin-theme' && input.name !== 'admin-palette') return;
-  const key = input.name === 'admin-theme' ? 'theme' : 'palette';
-  if (key === 'theme') themeMode = input.value; else palette = input.value;
+  if (!['admin-theme', 'admin-palette', 'admin-style'].includes(input.name)) return;
+  const key = input.name.slice('admin-'.length);
+  if (key === 'theme') themeMode = input.value; else if (key === 'style') lookStyle = input.value; else palette = input.value;
   try { localStorage.setItem(key, JSON.stringify(input.value)); } catch { /* приватный режим */ }
   renderTheme();
 });
 systemTheme.addEventListener('change', renderTheme);
 window.addEventListener('storage', event => {
-  if (event.key !== null && event.key !== 'theme' && event.key !== 'palette') return;
+  if (event.key !== null && !['theme', 'palette', 'style'].includes(event.key)) return;
   themeMode = readPreference('theme', 'system');
   palette = readPreference('palette', 'forest');
+  lookStyle = readPreference('style', 'calm');
   renderTheme();
 });
 renderTheme();
