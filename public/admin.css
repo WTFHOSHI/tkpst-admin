@@ -419,3 +419,21 @@ body[data-auth="signed-out"] :is(.admin-tabs, .panel-session, .panel-brand div >
 :root[data-style="terminal"] .admin-tabs a.on { background: var(--text); color: var(--bg); }
 :root[data-style="terminal"] #app > .bar .t { text-transform: lowercase; }
 :root[data-style="terminal"] #app > .bar .t::before { content: "> "; color: var(--primary); }
+
+:root[data-style="paper"] body, :root[data-style="paper"] :is(button, input, select, textarea) { font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, "Noto Serif", serif; }
+:root[data-style="paper"] body { background: repeating-linear-gradient(to bottom, transparent 0 31px, color-mix(in srgb, var(--outline) 38%, transparent) 31px 32px), var(--bg); background-attachment: fixed; min-height: 100dvh; }
+:root[data-style="paper"] :is(.card, .att-nav) { background: var(--bg); border: 1px solid var(--outline); border-radius: 6px; box-shadow: none; }
+:root[data-style="paper"] :is(.btn, .small-btn, .chip, .admin-tabs a, input, select, textarea) { border-radius: 4px; }
+:root[data-style="paper"] .admin-tabs a.on { background: transparent; color: var(--primary); text-decoration: underline; text-underline-offset: 5px; }
+:root[data-style="paper"] #app > .bar .t { font-style: italic; }
+
+:root[data-style="neon"] body { background: radial-gradient(90% 50% at 50% 0%, color-mix(in srgb, var(--primary) 16%, var(--bg)) 0%, transparent 70%), var(--bg); background-attachment: fixed; min-height: 100dvh; }
+:root[data-style="neon"] :is(.card, .att-nav) { background: color-mix(in srgb, var(--card) 70%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 34%, transparent); }
+:root[data-style="neon"] :is(.btn:not(.outline), .admin-tabs a.on) { box-shadow: 0 0 16px color-mix(in srgb, var(--primary) 55%, transparent); }
+:root[data-style="neon"] #app > .bar .t { text-shadow: 0 0 22px color-mix(in srgb, var(--primary) 45%, transparent); }
+
+:root[data-style="outline"] :is(.card, .att-nav, .btn, .small-btn, .admin-tabs) { border: 2px solid var(--text); border-radius: 10px; }
+:root[data-style="outline"] :is(.card, .att-nav) { background: var(--bg); box-shadow: 4px 4px 0 var(--text); }
+:root[data-style="outline"] :is(.btn, .small-btn) { box-shadow: 3px 3px 0 var(--text); }
+:root[data-style="outline"] :is(.btn, .small-btn):active { transform: translate(3px, 3px); box-shadow: none; }
+:root[data-style="outline"] #app > .bar .t { text-transform: uppercase; font-weight: 900; }

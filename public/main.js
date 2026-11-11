@@ -24,10 +24,16 @@ const paletteOptions = [
   ['forest', 'Зелёная', '#4F6F2F'], ['ocean', 'Синяя', '#285A91'],
   ['violet', 'Лиловая', '#6A4EA3'], ['sand', 'Тёплая', '#8B5319'],
   ['rose', 'Розовая', '#A8455F'], ['teal', 'Бирюзовая', '#1F6F6B'],
+  ['crimson', 'Красная', '#B3261E'],
+  ['amber', 'Янтарная', '#8A5A00'],
+  ['indigo', 'Индиго', '#3F4FB5'],
+  ['mint', 'Мятная', '#2B7A56'],
+  ['sky', 'Небесная', '#0B6FA8'],
+  ['graphite', 'Графит', '#46525E'],
   ['mono', 'Чёрно-белая', 'linear-gradient(90deg, #161616 50%, #fff 50%)'],
 ];
 // Стили те же, что в приложении: меняют форму, шрифт и поверхности.
-const styleOptions = [['calm', 'Спокойный'], ['quiet', 'Тихий'], ['native', 'Системный'], ['glass', 'Стекло'], ['soft', 'Мягкий'], ['terminal', 'Терминал']];
+const styleOptions = [['calm', 'Спокойный'], ['quiet', 'Тихий'], ['native', 'Системный'], ['glass', 'Стекло'], ['soft', 'Мягкий'], ['terminal', 'Терминал'], ['paper', 'Бумага'], ['neon', 'Неон'], ['outline', 'Контур']];
 const colorRoles = ["primary","on-primary","primary-c","on-primary-c","secondary-c","on-secondary-c","secondary","tertiary","tertiary-c","on-tertiary-c","bg","card","card-high","text","muted","outline"];
 const paletteColors = {
   "ocean": [
@@ -49,6 +55,30 @@ const paletteColors = {
   "teal": [
     "#1F6F6B #fff #CDEDE9 #06302D #DFEEEC #152524 #536765 #86562A #F8E2CC #331A04 #F4F9F8 #EAF3F2 #DDE9E8 #16211F #51625F #B9CCC9",
     "#8FD6CF #053B37 #1F504C #C8F0EB #2E4341 #DAEEEB #B4CBC8 #F0BC8A #64401C #FCE2C8 #0F1716 #18221F #24322F #E4F0EE #B5C8C5 #40524F"
+  ],
+  "crimson": [
+    "#B3261E #FFFFFF #F0D4D2 #4B100D #EBDFDE #391C1B #795654 #7A5A2A #E4DED4 #312411 #FDF8F8 #F1E9E8 #E4D6D6 #291817 #665352 #C5AEAD",
+    "#DB9793 #4B100D #68211D #EECFCE #4D302F #E8DAD9 #C1A4A3 #BCAC94 #4B3B23 #E4DED4 #1B1212 #291C1B #3A2928 #EBE0DF #BCABAA #5B4443"
+  ],
+  "amber": [
+    "#8A5A00 #FFFFFF #E8DECC #3A2600 #E8E3DB #302715 #6F634C #4E6B2E #DCE1D5 #1F2B12 #FBFAF7 #EFECE6 #E0DCD3 #241E13 #615A4D #BEB6A8",
+    "#C7B085 #3A2600 #533B0E #E5DBC7 #443B29 #E4DFD6 #B8AF9D #A6B596 #354425 #DCE1D5 #181510 #252119 #352F24 #E8E4DD #B7B1A6 #544D3E"
+  ],
+  "indigo": [
+    "#3F4FB5 #FFFFFF #D9DCF0 #1A214C #E1E2EC #212539 #5C607A #8A4A7A #E8DBE4 #371E31 #F9FAFD #EAEBF1 #D9DAE5 #1B1D29 #565867 #B2B5C5",
+    "#A3ABDB #1A214C #2E3668 #D5D8EF #35394D #DDDEE8 #A9ADC1 #C4A4BC #53334B #E8DBE4 #14151B #1E2029 #2C2E3A #E2E3EB #AEB0BC #484B5B"
+  ],
+  "mint": [
+    "#2B7A56 #FFFFFF #D5E4DD #123324 #DFE6E3 #1D2D26 #576B62 #7A6230 #E4E0D6 #312713 #F9FBFA #E9EEEB #D7DFDB #19221E #535E59 #AFBCB6",
+    "#99BFAE #123324 #244B39 #D0E2DA #31413A #DBE2DF #A5B5AE #BCB098 #4B3F26 #E4E0D6 #131715 #1C2420 #29332E #E0E7E4 #ABB5B1 #45524C"
+  ],
+  "sky": [
+    "#0B6FA8 #FFFFFF #CEE2EE #052F47 #DCE5EA #172B36 #4F6876 #7D5D21 #E5DFD3 #32250D #F8FBFC #E7EDF0 #D4DEE3 #152128 #4F5D65 #AABAC3",
+    "#8ABAD5 #052F47 #144662 #C9DFEC #2B3F4A #D7E1E7 #9FB3BE #BEAE90 #4C3C1E #E5DFD3 #11171A #1A2328 #253138 #DEE6EA #A8B4BA #405059"
+  ],
+  "graphite": [
+    "#46525E #FFFFFF #DADCDF #1D2227 #E2E3E4 #232528 #5E6164 #7A5A2A #E4DED4 #312411 #F9FAFA #EAEBEC #DADBDC #1C1D1F #57595B #B3B5B7",
+    "#A6ACB2 #1D2227 #31373D #D6D9DC #37393C #DDDEE0 #ABADB0 #BCAC94 #4B3B23 #E4DED4 #141516 #1F2021 #2C2E2F #E2E3E4 #AFB0B2 #494B4D"
   ],
   "mono": [
     "#303030 #fff #E2E2E2 #161616 #ECECEC #222 #555 #424242 #DEDEDE #202020 #fff #F4F4F4 #EAEAEA #161616 #555 #C6C6C6",
