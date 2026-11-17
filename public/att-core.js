@@ -27,6 +27,22 @@ export const addDays = (iso, n) => fromMs(toMs(iso) + n * DAY);
 export const weekday = (iso) => { const d = new Date(toMs(iso)).getUTCDay(); return d === 0 ? 7 : d; };
 export const mondayOf = (iso) => addDays(iso, 1 - weekday(iso));
 export const weekDays = (monday) => [0, 1, 2, 3, 4, 5].map((i) => addDays(monday, i));
+
+// ИС-25-3С поступила в 2025 году: 1 курс — 2025/26, 2 курс — 2026/27, 3 курс — 2027/28.
+export const ADMISSION_YEAR = 2025;
+/**
+ * Учебный год курса: с 1 сентября по 31 августа.
+ * firstMonday/lastMonday — недели, которые относятся к курсу (неделя с 1 сентября — уже новый курс).
+ */
+export function courseYear(course, admission = ADMISSION_YEAR) {
+  const n = Number(course);
+  if (!Number.isInteger(n) || n < 1) return null;
+  const y = admission + n - 1;
+  const from = `${y}-09-01`, to = `${y + 1}-08-31`;
+  return { from, to, firstMonday: mondayOf(from), lastMonday: addDays(mondayOf(`${y + 1}-09-01`), -7) };
+}
+/** Неделя (понедельник) относится к учебному году курса? */
+export const weekInCourse = (monday, year) => !year || (monday >= year.firstMonday && monday <= year.lastMonday);
 export const ym = (iso) => iso.slice(0, 7);
 export const ddmm = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
 export const ddmmyyyy = (iso) => `${ddmm(iso)}.${iso.slice(0, 4)}`;
@@ -323,7 +339,7 @@ export function monthsSheet({ title, weeks, students, months }) {
  * Книга Excel. kind: 'week' | 'month' | 'course'.
  * weeks: {monday: doc}; schedule: {iso: [пары]}; key: понедельник недели или 'YYYY-MM' месяца.
  */
-export function attendanceWorkbook({ kind, key, courseTitle, students, weeks, schedule = {}, exportedAt }) {
+export function attendanceWorkbook({ kind, key, courseTitle, students, weeks, schedule = {}, exportedAt, year = null }) {
   const title = `Посещаемость · ${courseTitle}`;
   const sheets = [];
   const sortedWeeks = Object.keys(weeks).sort();
@@ -343,13 +359,20 @@ export function attendanceWorkbook({ kind, key, courseTitle, students, weeks, sc
     }
     return { sheets, file: `Посещаемость ${courseTitle} ${monthTitle(key)}.xlsx` };
   }
-  // Весь курс
-  const from = sortedWeeks[0], to = sortedWeeks.length ? addDays(sortedWeeks[sortedWeeks.length - 1], 5) : null;
+  // Весь курс — только недели учебного года курса (если он передан), дни вне года не считаются.
+  const courseWeeks = sortedWeeks.filter((m) => weekInCourse(m, year));
+  const inYear = (d) => !year || (d >= year.from && d <= year.to);
+  const yearWeeks = Object.fromEntries(courseWeeks.map((m) => [m, weeks[m]]));
+  let from = courseWeeks[0], to = courseWeeks.length ? addDays(courseWeeks[courseWeeks.length - 1], 5) : null;
+  if (year && from) { if (from < year.from) from = year.from; if (to > year.to) to = year.to; }
   const studs = from ? activeStudents(students, from, to) : (students || []).filter(s => !s.deleted);
-  const months = [...new Set(sortedWeeks.flatMap((m) => weekDays(m)).filter((d) => sortedWeeks.some((w) => weeks[w] && Object.values(weeks[w].m || {}).some((x) => x[d]))).map(ym))].sort();
-  sheets.push(totalsSheet({ title, period: from ? `с ${dMonth(from)} ${from.slice(0, 4)} по ${dMonth(to)} ${to.slice(0, 4)}` : '(данных нет)', weeks, students: studs, exportedAt }));
-  if (months.length) sheets.push(monthsSheet({ title, weeks, students: studs, months }));
-  for (const m of sortedWeeks) sheets.push(weekSheet({ title, monday: m, week: weeks[m], students, schedule, exportedAt }));
+  const months = [...new Set(courseWeeks.flatMap((m) => weekDays(m)).filter((d) => inYear(d) && courseWeeks.some((w) => weeks[w] && Object.values(weeks[w].m || {}).some((x) => x[d]))).map(ym))].sort();
+  sheets.push(totalsSheet({ title, period: from ? `с ${dMonth(from)} ${from.slice(0, 4)} по ${dMonth(to)} ${to.slice(0, 4)}` : '(данных нет)', weeks: yearWeeks, students: studs, dayOk: inYear, exportedAt }));
+  if (months.length) sheets.push(monthsSheet({ title, weeks: yearWeeks, students: studs, months }));
+  for (const m of courseWeeks) {
+    const days = weekDays(m).filter(inYear);
+    sheets.push(weekSheet({ title, monday: m, week: weeks[m], students, schedule, exportedAt, ...(days.length < 6 ? { days } : {}) }));
+  }
   return { sheets, file: `Посещаемость ${courseTitle} весь курс.xlsx` };
 }
 
