@@ -6,6 +6,7 @@ import { T, buildTimeline, setOverrides, parseLessons } from './js/core.js?v=__V
 import {
   MARKS, ALL_MARKS, MARK, ABSENT, addDays, weekday, mondayOf, weekDays, ym, ddmm, dMon, dMonth, monthTitle, WD,
   weeksOfMonth, monthOfWeek, activeStudents, dayPairs, studentTotals, attendanceWorkbook, buildXlsx, parseOldXlsx,
+  courseYear, weekInCourse,
 } from './att-core.js?v=__V__';
 import { api as backend, loggedIn, logout, syncUsers, syncAttendanceHistory } from './backend.js?v=__V__';
 
@@ -571,14 +572,16 @@ async function doExport(kind, btn) {
       weeks = (await api(`weeks?course=${st.course}&from=${ws[0]}&to=${ws[ws.length - 1]}`)).weeks;
       if (ws.includes(st.monday)) weeks[st.monday] = weekView();
     } else {
-      weeks = (await api(`weeks?course=${st.course}`)).weeks;
-      if (st.week && (Object.keys(st.week.m).length || st.pending.size)) weeks[st.monday] = weekView();
+      // Только учебный год курса: 1 сентября – 31 августа.
+      const y = courseYear(st.course);
+      weeks = (await api(`weeks?course=${st.course}&from=${y.firstMonday}&to=${y.lastMonday}`)).weeks;
+      if (weekInCourse(st.monday, y) && st.week && (Object.keys(st.week.m).length || st.pending.size)) weeks[st.monday] = weekView();
     }
     if (kind === 'course' && !Object.keys(weeks).length) throw new Error('у курса пока нет отметок');
     const schedule = {};
     const gid = OWN_GROUP;
     for (const [k, v] of st.schedule) { const [g, d] = k.split('|'); if (Number(g) === gid && v.pairs) schedule[d] = v.pairs; }
-    const wb = attendanceWorkbook({ kind, key, courseTitle: courseTitle(), students: course().students, weeks, schedule, exportedAt: todayIso() });
+    const wb = attendanceWorkbook({ kind, key, courseTitle: courseTitle(), students: course().students, weeks, schedule, exportedAt: todayIso(), year: kind === 'course' ? courseYear(st.course) : null });
     const blob = new Blob([buildXlsx(wb.sheets)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = wb.file;
@@ -649,8 +652,12 @@ async function settingsPanel(box) {
       const r = await parseOldXlsx(await f.arrayBuffer());
       const mons = Object.keys(r.weeks).sort();
       if (!r.marks) throw new Error('не нашёл отметок — проверь, что это та таблица');
+      const y = courseYear(st.course);
+      const outside = mons.filter((m) => !weekInCourse(m, y));
+      const warn = outside.length ? `<p class="warn">Внимание: ${outside.length} из ${mons.length} недель не из учебного года ${esc(courseTitle())}
+        (${dMon(y.from)} ${y.from.slice(0, 4)} – ${dMon(y.to)} ${y.to.slice(0, 4)}). Похоже, это таблица другого курса — проверь, что выбран нужный курс.</p>` : '';
       out.innerHTML = `<p class="ok">Нашёл ${r.marks} отметок, ${r.students.length} студентов, ${mons.length} недель (${dMon(mons[0])} ${mons[0].slice(0, 4)} – ${dMon(addDays(mons[mons.length - 1], 5))} ${mons[mons.length - 1].slice(0, 4)}).</p>
-        <button class="btn" data-doimp>Загрузить в ${esc(courseTitle())}</button>`;
+        ${warn}<button class="btn" data-doimp>${outside.length ? 'Всё равно загрузить' : 'Загрузить'} в ${esc(courseTitle())}</button>`;
       out.querySelector('[data-doimp]').onclick = async (e) => {
         e.target.disabled = true; e.target.textContent = 'Загружаю…';
         try {

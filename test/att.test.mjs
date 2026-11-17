@@ -89,3 +89,22 @@ test('removed pairs do not contribute residual marks to attendance totals', () =
   assert.equal(result.total, 1);
   assert.equal(result.rate, 1);
 });
+
+test('весь курс — только учебный год курса', async () => {
+  assert.deepEqual(A.courseYear(1), { from: '2025-09-01', to: '2026-08-31', firstMonday: '2025-09-01', lastMonday: '2026-08-24' });
+  assert.deepEqual(A.courseYear(2), { from: '2026-09-01', to: '2027-08-31', firstMonday: '2026-08-31', lastMonday: '2027-08-23' });
+  const students = [{ id: 'a', name: 'Петров Пётр' }];
+  const weeks = {
+    '2025-10-06': { m: { a: { '2025-10-06': { 1: 'N' } } }, pairs: {} },
+    '2026-08-31': { m: { a: { '2026-08-31': { 1: 'N' }, '2026-09-01': { 1: 'P' } } }, pairs: {} },
+    '2026-11-16': { m: { a: { '2026-11-16': { 1: 'P' } } }, pairs: {} },
+  };
+  const wb = A.attendanceWorkbook({ kind: 'course', key: null, courseTitle: '2 курс', students, weeks, year: A.courseYear(2) });
+  const names = wb.sheets.map((s) => s.name);
+  assert.ok(!names.some((n) => n.startsWith('06.10')), 'неделя 1 курса не попала');
+  assert.ok(names.includes('01.09-05.09') && names.includes('16.11-21.11'));
+  assert.match(wb.sheets[0].rows[1][0].v, /с 1 сентября 2026 по 21 ноября 2026/);
+  // 31 августа (Н) не считается — в итогах 2 пары, обе «был»
+  const t = A.studentTotals('a', Object.fromEntries(Object.entries(weeks).filter(([m]) => A.weekInCourse(m, A.courseYear(2)))), (d) => d >= '2026-09-01');
+  assert.equal(t.P, 2); assert.equal(t.N, 0);
+});
